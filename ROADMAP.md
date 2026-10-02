@@ -6,7 +6,7 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 
 ## Status
 
-- **Phase:** P1 closed 2026-10-02 (trace: traces/2026-10-02-p1-core.md), pending merge. Next: PA0 (prior art) and P4 (quirks) are ready; P2 waits on the render-stack decision.
+- **Phase:** PA0 — prior-art landscape (current, chosen 2026-10-02). P1 closed and merged 2026-10-02 (trace: traces/2026-10-02-p1-core.md). P4 (quirks) is also ready; P2 waits on the render-stack decision.
 - **Oracle:** `fast` = kit gates, structure, golden sha256 pins, compare.js
   self-test with a planted divergence, reference regenerates default-seed-1
   byte-identically, C++ build + JS-vs-C++ vectors + fdlibm trig + C++
@@ -27,8 +27,8 @@ store-rounding, SPEC §8 quirks (port faithfully, decide in P4).
 Each phase closes when `./verify full` is green **and** its acceptance criteria
 hold **and** a `traces/` entry is written.
 
-### PA0 — Prior-art landscape (Decision 30 bookend)
-- **Status:** open (runs alongside P0/P1; must close before P5 design is committed)
+### PA0 — Prior-art landscape (Decision 30 bookend) ← current
+- **Status:** in progress (must close before P5 design is committed)
 - **Acceptance:** `docs/prior-art.md`, dated and cited, covering: Life-like rule
   spaces and rule-changing CAs, open-ended evolution in CA (Lenia, Flow-Lenia,
   Evoloops), causal emergence / effective information (Hoel) and coarse-graining
@@ -44,7 +44,7 @@ hold **and** a `traces/` entry is written.
   3. The same `./verify fast` is green in GitHub Actions on the first push/PR. ✅ 2026-10-02, run 36959155390 (Linux, Node v24.21.0)
 - **Out of scope:** any C++.
 
-### P1 — Headless core, bit-exact ← current (in review: PR #2)
+### P1 — Headless core, bit-exact
 - **Status:** done 2026-10-02 (trace: traces/2026-10-02-p1-core.md)
 - **Scope:** `core/` (libculture), `trace/` CLI, unit tests, CMake.
 - **Build order:** RNG+hash → screen+growth → life update+noise → territory →
