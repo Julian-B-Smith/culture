@@ -78,6 +78,8 @@ board-wiping behavior is a defect (D-005). Packet: `docs/handoff/`.
 `tools/compare.js`). Phase 1+: C++20, CMake with `-G "Unix Makefiles"` (CLT
 only, no Xcode/Ninja); always pass absolute build paths. Render and audio
 stacks are undecided (ROADMAP P2/P3 gates). Target layout: PORT_PLAN.md.
+`-ffp-contract=off` in CMakeLists.txt is load-bearing: FMA contraction changes
+double rounding and breaks parity.
 
 **Domain invariants.**
 - `core/` is pure: no clock, no threads, no I/O, no unseeded randomness. Seeded
@@ -98,11 +100,15 @@ stacks are undecided (ROADMAP P2/P3 gates). Target layout: PORT_PLAN.md.
 `reference/core.js`, `tools/golden.js`, `tools/compare.js`,
 `golden/PINS.sha256`, `docs/handoff/` (packet as received), `./verify`.
 
-**Verify targets.** `fast` (~8 s): kit integrity, leak gate, structure, golden
-sha256 pins, compare.js self-test (planted divergence must FAIL), reference
-regenerates default-seed-1 byte-identically. `full` (~30 s): fast + all four
-goldens regenerated. Phase 1 adds C++ build/unit tests to fast and C++-vs-golden
-traces + the 440×280 Release budget to full.
+**Verify targets.** `fast` (~35 s warm): kit integrity, leak gate, structure,
+golden sha256 pins, compare.js self-test (planted divergence must FAIL),
+reference regenerates default-seed-1, C++ Release build, JS-vs-C++ unit
+vectors (incl. pow/log2), fdlibm trig hash, C++ default-seed-1 vs golden,
+deep hidden-state parity (default seed 1 + chaos seed 7).
+`full` (~2.5 min): fast + the other three goldens (reference and C++), deep
+parity on all of them + chaos seed 11, 440×280 bench < 4 ms on seeds 1–3.
+Trig in the core is `core/src/fdlibm.hpp` (explicit-fma fdlibm, D-027) —
+never `std::cos`/`std::sin`.
 
 **Delegation (rung 2).** Read-only subagents for SPEC/JS cross-checks;
 `verifier` (Haiku) for oracle runs; `critic` (Opus) on anything touching an

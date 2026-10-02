@@ -6,11 +6,15 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 
 ## Status
 
-- **Phase:** P1 — headless core, bit-exact (ready to start). P0 closed 2026-10-02 (trace: traces/2026-10-02-p0-close.md).
+- **Phase:** P1 closed 2026-10-02 (trace: traces/2026-10-02-p1-core.md), pending merge. Next: PA0 (prior art) and P4 (quirks) are ready; P2 waits on the render-stack decision.
 - **Oracle:** `fast` = kit gates, structure, golden sha256 pins, compare.js
   self-test with a planted divergence, reference regenerates default-seed-1
-  byte-identically. `full` = fast + all four goldens regenerated. **Gap:** no
-  C++ yet, so nothing port-side is checked; that arrives with P1.
+  byte-identically, C++ build + JS-vs-C++ vectors + fdlibm trig + C++
+  default-seed-1 vs golden + deep hidden-state parity (default 1, chaos 7).
+  `full` = fast + all four goldens (reference and C++) + deep parity on all
+  + chaos 11 + 440×280 bench. **Gap:** CI's node is the plain fdlibm flavor,
+  so there the JS-side trig check and trig stats in the deep line are n/a
+  (visible in the output, D-027); everything else runs on both platforms.
 - **Last human ratification:** 2026-10-01 — spin-up manifest ratified by poll.
 
 ## Invariants under active protection
@@ -41,7 +45,7 @@ hold **and** a `traces/` entry is written.
 - **Out of scope:** any C++.
 
 ### P1 — Headless core, bit-exact
-- **Status:** open (ready)
+- **Status:** done 2026-10-02 (trace: traces/2026-10-02-p1-core.md)
 - **Scope:** `core/` (libculture), `trace/` CLI, unit tests, CMake.
 - **Build order:** RNG+hash → screen+growth → life update+noise → territory →
   surprise → search+placement → extinction+retreat → crowding+reign →
@@ -50,15 +54,24 @@ hold **and** a `traces/` entry is written.
 - **Acceptance:**
   1. All four goldens (`default-seed-1..3`, `stress-seed-4`) PASS
      `tools/compare.js` for full length including the births footer — wired
-     into `./verify full`; default-seed-1 also in `fast`.
+     into `./verify full`; default-seed-1 also in `fast`. ✅ with
+     `--float-rel 0`, plus deep hidden-state parity (D-025, D-028).
   2. A 440×280 world steps in < 4 ms in a Release build (reference ≈ 12 ms),
-     measured by a bench target recorded in the trace.
+     measured by a bench target recorded in the trace. ✅ 2.0–2.2 ms mean
+     (`cpp_bench`, seeds 1–3, 4,000 steps, search excluded).
   3. Any transcendental-function divergence is fixed at the cause; a platform
      libm difference is recorded in DECISIONS with evidence. Integer checks are
-     never loosened.
+     never loosened. ✅ trig vendored as explicit-fma fdlibm (D-027);
+     pow and log2 measured equal to V8 at the precision the core uses.
 
 ### P2 — Viewer
-- **Status:** blocked on P1
+- **Status:** blocked on the render-stack decision (P1 done)
+- **Carried from the P1 review:** the 60 fps budget is a frame budget, so judge
+  the step's tail, not its mean: at 440×280 p99 is 2.6–4.0 ms but single steps
+  reach 5–60 ms (retreat and birth generations), and an instant search can
+  take 74–274 ms (critic). That is the case for the worker thread and
+  deterministic latency L = 30. `World` state is public and mutable; give the
+  UI and audio a read-only snapshot rather than the `World` itself.
 - **Blocking open question (ask the human at the gate):** rendering/windowing
   stack (SDL3, sokol, JUCE, raylib, …) — decide after a small spike (D-021).
 - **Acceptance:** PORT_PLAN P2 — all prototype controls and views; search timing
@@ -75,7 +88,7 @@ hold **and** a `traces/` entry is written.
   off by ear** on register spread and riser level.
 
 ### P4 — Decide the quirks
-- **Status:** blocked on P1
+- **Status:** open (ready; each quirk is a human call)
 - **Acceptance:** each SPEC §8 quirk kept (documented) or changed (new DECISIONS
   entry, goldens regenerated and re-pinned). DECISIONS records which
   implementation (JS or C++) is canonical from then on.

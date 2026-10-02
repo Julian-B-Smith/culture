@@ -13,4 +13,5 @@ lives in [README.md §Map](README.md#map); this file adds the harness.
 - `traces/`: one entry per merged change.
 - `.claude/`: hooks, agents (implementer=sonnet, verifier=haiku, critic=opus), provenance skill.
 - `.github/workflows/ci.yml`: runs `./verify fast` on Linux.
-- Planned (P1+): `core/`, `trace/`, `audio/`, `app/` per docs/handoff/PORT_PLAN.md.
+- `core/`, `trace/`, `tests/`, `CMakeLists.txt`: the C++ port (P1); see README §Map.
+- Planned (P2+): `audio/`, `app/` per docs/handoff/PORT_PLAN.md.
