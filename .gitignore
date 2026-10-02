@@ -1,0 +1,8 @@
+.harness/
+.claude/settings.local.json
+.DS_Store
+build/
+build-*/
+# The handoff packet as delivered; its contents were copied into the repo (D-022).
+/culture-handoff/
+/Culture.html

@@ -1,0 +1,8 @@
+# Large, machine-checked artifacts: read through tools/compare.js, not by eye.
+golden/*.jsonl
+# The all-in-one prototype duplicates core.js + sound.js + ui.js; read those instead.
+reference/culture.html
+# Untracked originals of the handoff packet (copies live in the repo).
+culture-handoff/
+Culture.html
+.harness/

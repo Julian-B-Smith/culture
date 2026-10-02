@@ -1,0 +1,38 @@
+# Runs the project's ONE oracle (./verify fast) in the cloud, mirroring the
+# local Stop-hook gate. Copied from autonomous kit/templates/ci.github.yml.
+# Public repo: Actions minutes are free; the economical triggers stay anyway.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # verify's structure gate parses the manifest with python3.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      # The JS reference and the oracle tools need Node >= 18; no npm deps.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+      # P1 adds: sudo apt-get install -y cmake build-essential
+      - name: verify fast
+        run: |
+          chmod +x verify
+          ./verify fast

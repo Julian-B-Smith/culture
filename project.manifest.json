@@ -1,0 +1,55 @@
+{
+  "schema": "project-manifest.0 (draft — kit v2 will formalize)",
+  "kit_version": "2.6.5",
+  "status": "PROVISIONAL — awaiting ratification poll. Phase state: see ROADMAP.md",
+  "spinup_note": "Spun up 2026-10-01 from the Culture handoff packet (docs/handoff/); packet open questions polled alongside the 9 survey questions.",
+  "survey": {
+    "what_is_it": "library/engine + app — libculture (pure C++20 deterministic CA core), a headless trace CLI, and one native macOS viewer with ambient sonification. Other form factors (plugin, FOUNDATIONS module) may wrap the core later; not composite now.",
+    "architecture_rung": {
+      "choice": 2,
+      "menu": [
+        "1: single thread",
+        "2: thread + subagents/verifier",
+        "3: organ fleet"
+      ],
+      "earned_by": "the port is serial and fully specified; read-only subagents for SPEC/JS cross-checks and an independent verifier on parity claims earn their keep. No parallel writers; core/audio/app seams not yet frozen enough to justify a fleet."
+    },
+    "domain_core_llm_must_not_own": "simulation core (world step, mulberry32 RNG and its call order, rule screening and search, territory, surprise, float32 storage semantics), the trace format, and the sonification mapping/DSP math. AI may propose code; golden traces and bit-reproducible offline audio renders decide. No wall-clock time in core/.",
+    "oracle_shape": {
+      "goldens": "strict bit-exact: golden/*.jsonl from the JS reference via tools/compare.js — integer state exact, only record/lastMax carry compare.js's relative tolerance. Goldens change only by a recorded DECISIONS entry.",
+      "ci": "single-platform smoke (Linux, Node + C++ core); macOS app builds stay local"
+    },
+    "second_implementation": {
+      "planned": true,
+      "shape": "port-pin: reference/core.js is the pinned oracle; the C++ core must match the goldens. Phase 4 records which implementation becomes canonical."
+    },
+    "consumers_and_providers": {
+      "consumes": [],
+      "consumed_by": [],
+      "note": "standalone for now; a Reverb Station or FOUNDATIONS intake brief is a later, recorded decision"
+    },
+    "parallel_audit_thread": false,
+    "knowledge_loop_tags": [
+      "parity-and-float",
+      "perf",
+      "sonification",
+      "emergence-dynamics"
+    ],
+    "lifespan_autonomy": {
+      "lifespan": "long-lived (art/research system)",
+      "autonomy_tier": "interactive: attended sessions; own-branch push + PR are the agent's, merging is the human's; no unattended runs"
+    }
+  },
+  "packet_questions": {
+    "form_factor": "engine lib + standalone app",
+    "platforms": "macOS first (Apple Silicon, Command Line Tools only); core + trace CLI portable C++20; Vision Pro deferred",
+    "rendering_stack": "DEFERRED to the phase-2 gate (spike then decide)",
+    "audio_stack": "DEFERRED to the phase-3 gate, incl. whether Reverb Station's FDN replaces convolution reverb",
+    "parity_strictness": "bit-exact is a hard phase-1 gate",
+    "search_timing": "deterministic latency, L = 30 generations, for live play; instant mode always available for verification",
+    "priority_after_port": "synthesis — recursive coarse-graining (D-001, PORT_PLAN phase 5)",
+    "repo": "github.com/Julian-B-Smith/culture (public)",
+    "packet_disposition": "reference/, tools/, golden/ copied unchanged to repo root; packet docs in docs/handoff/; the original culture-handoff/ and Culture.html kept on disk, gitignored"
+  },
+  "remote": "github.com/Julian-B-Smith/culture (public)"
+}

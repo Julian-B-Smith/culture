@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# verify — oracle dispatcher. The harness's only interface to project QC.
+# Usage: ./verify fast | full | report
+# Contract: exit 0 = green, nonzero = red. Writes .harness/last-verify.json.
+#
+# THIS FILE IS PROJECT-OWNED: edit `fast` and `full` freely, add project gates,
+# wire your test commands. The kit-owned gates live in `.kit/kit-gates.sh`,
+# which is vendored and checksummed — do not edit that one, and do not copy its
+# contents here. Update it with:  python3 <kit>/kit_sync.py .
+set -uo pipefail
+
+TARGET="${1:-fast}"
+HARNESS_DIR=".harness"
+mkdir -p "$HARNESS_DIR"
+
+# Kit-owned gates: record, leak_gate, kit_integrity. A repo missing this file
+# is not a lesser repo, it is an UNGATED one, so failing loudly beats degrading
+# quietly — a silently skipped privacy gate is exactly the shape of bug the
+# gate exists to prevent.
+if [ -r .kit/kit-gates.sh ]; then
+  . .kit/kit-gates.sh
+else
+  echo "verify: .kit/kit-gates.sh missing — run kit_sync.py (gates cannot be skipped)" >&2
+  exit 1
+fi
+
+# ---- Project gates ----------------------------------------------------------
+
+# The files the charter and ROADMAP point at. A missing one means an agent
+# would orient against nothing, so it is red, not a warning.
+structure_gate() {
+  local ok=0 f
+  for f in CLAUDE.md README.md ROADMAP.md DECISIONS.md INDEX.md LIBRARY.md \
+           project.manifest.json reference/core.js tools/golden.js tools/compare.js \
+           golden/PINS.sha256 traces/README.md; do
+    [ -e "$f" ] || { echo "structure_gate: missing $f" >&2; ok=1; }
+  done
+  python3 -c 'import json,sys; m=json.load(open("project.manifest.json")); sys.exit(0 if m["survey"]["architecture_rung"]["choice"] in (1,2,3) else 1)' \
+    || { echo "structure_gate: project.manifest.json unparseable or rung missing" >&2; ok=1; }
+  [ "$ok" = 0 ] && echo "structure_gate: ok"
+  return $ok
+}
+
+# Goldens, the reference core that produced them, and the two oracle tools are
+# pinned by sha256. They change only through a recorded DECISIONS entry that
+# also re-pins (PORT_PLAN phase 0). Without this pin, "never regenerate into
+# golden/" is a sentence; with it, it is a red build.
+golden_pin_gate() {
+  if shasum -a 256 -c golden/PINS.sha256 >/dev/null 2>&1; then
+    echo "golden_pin_gate: ok ($(wc -l < golden/PINS.sha256 | tr -d ' ') files)"
+  else
+    echo "golden_pin_gate: FAIL — a pinned oracle file changed:" >&2
+    shasum -a 256 -c golden/PINS.sha256 2>&1 | grep -v ': OK$' >&2
+    return 1
+  fi
+}
+
+# Regenerate golden traces from the reference into a temp dir and require
+# byte identity. Proves the reference still runs headless and is still the
+# thing that produced the goldens (node version drift would show up here).
+# Args: "<profile> <seed>" pairs.
+reference_selfcheck() {
+  command -v node >/dev/null || { echo "reference_selfcheck: node not found (need >= 18)" >&2; return 1; }
+  local tmp ok=0 pair profile seed
+  tmp="$(mktemp -d)"
+  for pair in "$@"; do
+    profile="${pair% *}"; seed="${pair#* }"
+    node tools/golden.js --profile "$profile" --out "$tmp" "$seed" >/dev/null || { ok=1; continue; }
+    if cmp -s "$tmp/$profile-seed-$seed.jsonl" "golden/$profile-seed-$seed.jsonl"; then
+      echo "reference_selfcheck: $profile-seed-$seed byte-identical"
+    else
+      echo "reference_selfcheck: FAIL — $profile-seed-$seed differs from golden" >&2; ok=1
+    fi
+  done
+  rm -rf "$tmp"
+  return $ok
+}
+
+# compare.js must PASS a golden against itself AND FAIL on a planted
+# divergence. A comparator that never fires would make every future port
+# trace green (kit README: assert the effective state — prove the detector
+# fires, then trust its silence).
+compare_selftest() {
+  local tmp g=golden/default-seed-1.jsonl
+  tmp="$(mktemp -d)"
+  # Here pipefail helps: compare.js must also EXIT 0, not just print PASS.
+  node tools/compare.js "$g" "$g" | grep -q '^PASS' \
+    || { echo "compare_selftest: FAIL — golden vs itself did not PASS" >&2; rm -rf "$tmp"; return 1; }
+  # Plant: flip one tier count in generation 1000's line (line 1001; line 1 is the header).
+  node -e '
+    const fs=require("fs"); const L=fs.readFileSync(process.argv[1],"utf8").split("\n");
+    const o=JSON.parse(L[1000]); o.tiers+=1; L[1000]=JSON.stringify(o);
+    fs.writeFileSync(process.argv[2], L.join("\n"));' "$g" "$tmp/planted.jsonl"
+  # Capture, don't pipe: compare.js exits 1 on FAIL, and under `pipefail` a
+  # `| grep -q` pipeline would then report failure even when grep matched.
+  local out; out="$(node tools/compare.js "$g" "$tmp/planted.jsonl")"
+  if printf '%s\n' "$out" | grep -q '^FAIL at line 1001'; then
+    echo "compare_selftest: ok (self PASS, planted divergence caught at line 1001)"
+    rm -rf "$tmp"; return 0
+  fi
+  echo "compare_selftest: FAIL — planted divergence not caught" >&2
+  rm -rf "$tmp"; return 1
+}
+
+fast() {
+  # ---- Layer-0: seconds, not minutes. CI-blocking. -------------------------
+  local ok=0
+  kit_integrity || ok=1      # kit-owned files must match .kit/MANIFEST
+  leak_gate     || ok=1      # privacy gate: kit-core, keep it first
+  structure_gate   || ok=1
+  golden_pin_gate  || ok=1
+  compare_selftest || ok=1
+  reference_selfcheck "default 1" || ok=1   # ~6 s; the other three run in full
+  # Phase 1 adds here: cmake build of core/ + unit tests, and a C++ trace of
+  # default seed 1 compared with tools/compare.js.
+  return $ok
+}
+
+full() {
+  fast || return $?
+  # ---- Layer-E: the whole gate. Run before closing a queue item. -----------
+  local ok=0
+  reference_selfcheck "default 2" "default 3" "stress 4" || ok=1   # ~25 s
+  # Phase 1 adds here: C++ traces for all four goldens through tools/compare.js,
+  # and the 440x280 Release step-time budget.
+  return $ok
+}
+
+case "$TARGET" in
+  fast)   fast;  record fast  $? ;;
+  full)   full;  record full  $? ;;
+  report) cat "$HARNESS_DIR/last-verify.json" 2>/dev/null || { echo '{"target":null,"exit":null}'; exit 1; } ;;
+  *)      echo "usage: ./verify fast|full|report" >&2; exit 64 ;;
+esac
