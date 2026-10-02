@@ -1,7 +1,7 @@
 {
   "schema": "project-manifest.0 (draft — kit v2 will formalize)",
   "kit_version": "2.6.5",
-  "status": "PROVISIONAL — awaiting ratification poll. Phase state: see ROADMAP.md",
+  "status": "RATIFIED 2026-10-01 (ratification poll). Phase state: see ROADMAP.md",
   "spinup_note": "Spun up 2026-10-01 from the Culture handoff packet (docs/handoff/); packet open questions polled alongside the 9 survey questions.",
   "survey": {
     "what_is_it": "library/engine + app — libculture (pure C++20 deterministic CA core), a headless trace CLI, and one native macOS viewer with ambient sonification. Other form factors (plugin, FOUNDATIONS module) may wrap the core later; not composite now.",

@@ -101,3 +101,6 @@ Polled one question at a time; answers recorded in `project.manifest.json`. Form
 
 **D-023: Golden pinning is a verify gate (2026-10-01).**
 `golden/PINS.sha256` pins the four golden traces, `reference/core.js`, `tools/golden.js` and `tools/compare.js`. `./verify fast` goes red if any of them changes. Changing a pinned file requires a new DECISIONS entry that states why and re-pins in the same commit. `fast` also proves the comparator fires (a planted divergence must FAIL) and regenerates default-seed-1 byte-identically; `full` regenerates all four.
+
+**D-024: Manifest ratified; one bootstrap push to main (2026-10-01).**
+The human ratified the spin-up manifest by poll. Because the GitHub repo was empty (no base branch for a PR), the human approved a single bootstrap push of the initial commits to `main`. From here on, all work goes branch + PR; merging stays the human's (Decision 66).

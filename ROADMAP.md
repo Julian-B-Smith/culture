@@ -11,7 +11,7 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
   self-test with a planted divergence, reference regenerates default-seed-1
   byte-identically. `full` = fast + all four goldens regenerated. **Gap:** no
   C++ yet, so nothing port-side is checked; that arrives with P1.
-- **Last human ratification:** pending (spin-up manifest ratification poll).
+- **Last human ratification:** 2026-10-01 — spin-up manifest ratified by poll.
 
 ## Invariants under active protection
 
