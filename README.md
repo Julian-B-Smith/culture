@@ -9,12 +9,14 @@ before. It never reuses a rule. Color families react to each other, long reigns
 mutate, crowding slows things down, borders harden, sites remember harm, and an
 ambient sonification makes each ruleset a voice.
 
-*Last verified: 2026-10-02 — `./verify full` green. The C++ simulation matches the JS reference bit for bit: all four goldens, plus every per-site array, internal scalar and sound statistic each generation (sound-stat trig checked against node's Apple Silicon V8 build, D-027). 2.0–2.2 ms/step at 440×280.*
+*Last verified: 2026-10-02 — `./verify full` green. The C++ core is canonical (D-030). At the hand-over (tag `v0-js-parity`) it was proven bit-identical to the JS prototype, and its goldens now pin every hidden value each generation. 2.0–2.2 ms/step at 440×280.*
 
 ## Try it
 
 Open [reference/culture.html](reference/culture.html) in a browser. That is the
-working prototype; the native viewer does not exist yet.
+original prototype, frozen at v0. The C++ core is canonical now and will diverge
+from it as decisions land (D-030). A WebAssembly web build of the real core is
+in the backlog; the native viewer does not exist yet.
 
 Headless C++ core (macOS Command Line Tools or Linux, CMake >= 3.20):
 
@@ -29,9 +31,10 @@ Then `build/culture_trace --out /tmp 1` writes a golden-format trace, and
 
 | Part | State |
 |---|---|
-| JS reference (`reference/`) | ✅ working prototype; normative for the port |
-| Golden traces (`golden/`) | ✅ 4 traces, sha256-pinned, regenerate byte-identically |
-| C++ core `libculture` + trace CLI | ✅ bit-exact with the reference (P1); 2.0–2.2 ms/step at 440×280 (mean, Apple Silicon, Release) |
+| C++ core `libculture` + trace CLI | ✅ **canonical** (D-030); 2.0–2.2 ms/step at 440×280 (mean, Apple Silicon, Release) |
+| `core/ref/` naive core | ✅ frozen; every optimized core must match it bit for bit |
+| Golden traces (`golden/`, `golden/deep/`) | ✅ written by C++, sha256-pinned; deep goldens cover all hidden state |
+| JS prototype (`reference/`) | 🧊 frozen at `v0-js-parity`; goldens archived in `golden/js-v1/` |
 | Native viewer | ⏳ not built; render stack undecided (P2) |
 | Native sound | ⏳ not built; audio stack undecided (P3) |
 | Coarse-graining synthesis | ⏳ research goal (P5) |
@@ -42,12 +45,13 @@ Current phase and acceptance criteria: [ROADMAP.md](ROADMAP.md).
 
 | Path | What |
 |---|---|
-| `reference/` | browser prototype: `core.js` (deterministic sim), `sound.js`, `ui.js`, `culture.html` (all-in-one) |
-| `golden/` | golden traces + `PINS.sha256` (protected) |
-| `tools/` | `golden.js` (regenerate traces), `compare.js` (check a port trace) |
-| `core/` | `libculture`: the C++ port of `reference/core.js` |
-| `trace/` | `culture_trace`: trace writer, `--bench`, `--deep` |
-| `tests/` | JS-vs-C++ unit vectors, trig check, the deep-state tracer |
+| `reference/` | frozen v0 browser prototype: `core.js`, `sound.js`, `ui.js`, `culture.html` |
+| `core/` | `libculture`, the canonical simulation; `core/ref/` is the frozen naive core |
+| `golden/` | C++ golden traces, `deep/` hidden-state goldens, `js-v1/` archived JS goldens, `PINS.sha256` (protected) |
+| `tools/` | `compare.js` (check a trace against a golden); `golden.js` (frozen JS generator) |
+| `trace/` | `culture_trace`: trace writer, `--bench`, `--deep [--core ref]` |
+| `tests/` | pinned vectors and trig, property tests; `js/` holds the frozen hand-over tools |
+| `analysis/` | `culture_quirks`: P4 evidence (how often each quirk fires) |
 | `docs/handoff/` | the packet as received: BRIEF, SPEC, SOUND, PORT_PLAN |
 | `DECISIONS.md` | append-only design log, D-001 onward |
 | `ROADMAP.md` | phases and gates; outranks every other doc |

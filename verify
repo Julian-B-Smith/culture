@@ -25,16 +25,29 @@ else
 fi
 
 # ---- Project gates ----------------------------------------------------------
+#
+# Since D-030 (2026-10-02) the C++ core is CANONICAL. The JS reference is frozen
+# at tag v0-js-parity, where it was proven bit-identical to libculture; its
+# goldens are archived in golden/js-v1/. The oracle is now:
+#   - pinned C++ goldens (golden/*.jsonl) and pinned deep goldens
+#     (golden/deep/*.txt: every hidden array, scalar and stat, every gen),
+#     which guard against any UNINTENDED change;
+#   - core_ref, a frozen naive C++ core, as the independent second
+#     implementation every optimized core must match;
+#   - cross-toolchain parity: CI (Linux, GCC, glibc) checks these same pins,
+#     which were generated with Apple clang;
+#   - property tests that no golden can provide.
+# An INTENDED change to the simulation is a DECISIONS entry that regenerates
+# and re-pins the goldens in the same commit.
 
 # The files the charter and ROADMAP point at. A missing one means an agent
 # would orient against nothing, so it is red, not a warning.
 structure_gate() {
   local ok=0 f
   for f in CLAUDE.md README.md ROADMAP.md DECISIONS.md INDEX.md LIBRARY.md \
-           project.manifest.json reference/core.js tools/golden.js tools/compare.js \
-           golden/PINS.sha256 traces/README.md CMakeLists.txt core/src/core.cpp \
-           tests/vectors.js tests/deep.js tests/trig.js tests/trig_flavor.js \
-           tests/trig.expected core/src/fdlibm.hpp; do
+           project.manifest.json tools/compare.js golden/PINS.sha256 traces/README.md \
+           CMakeLists.txt core/src/core.cpp core/src/fdlibm.hpp core/ref/core_ref.cpp \
+           tests/vectors.expected tests/trig.expected tests/properties.cpp; do
     [ -e "$f" ] || { echo "structure_gate: missing $f" >&2; ok=1; }
   done
   python3 -c 'import json,sys; m=json.load(open("project.manifest.json")); sys.exit(0 if m["survey"]["architecture_rung"]["choice"] in (1,2,3) else 1)' \
@@ -43,10 +56,11 @@ structure_gate() {
   return $ok
 }
 
-# Goldens, the reference core that produced them, and the two oracle tools are
-# pinned by sha256. They change only through a recorded DECISIONS entry that
-# also re-pins (PORT_PLAN phase 0). Without this pin, "never regenerate into
-# golden/" is a sentence; with it, it is a red build.
+# Every oracle file is pinned by sha256: the C++ goldens and deep goldens, the
+# expected vector/trig outputs, the comparator, and the frozen JS hand-over
+# set (reference/, golden/js-v1/, tests/js/). They change only through a
+# DECISIONS entry that also re-pins (D-023, D-030). Without the pin, "never
+# regenerate the goldens casually" is a sentence; with it, a red build.
 golden_pin_gate() {
   if shasum -a 256 -c golden/PINS.sha256 >/dev/null 2>&1; then
     echo "golden_pin_gate: ok ($(wc -l < golden/PINS.sha256 | tr -d ' ') files)"
@@ -55,27 +69,6 @@ golden_pin_gate() {
     shasum -a 256 -c golden/PINS.sha256 2>&1 | grep -v ': OK$' >&2
     return 1
   fi
-}
-
-# Regenerate golden traces from the reference into a temp dir and require
-# byte identity. Proves the reference still runs headless and is still the
-# thing that produced the goldens (node version drift would show up here).
-# Args: "<profile> <seed>" pairs.
-reference_selfcheck() {
-  command -v node >/dev/null || { echo "reference_selfcheck: node not found (need >= 18)" >&2; return 1; }
-  local tmp ok=0 pair profile seed
-  tmp="$(mktemp -d)"
-  for pair in "$@"; do
-    profile="${pair% *}"; seed="${pair#* }"
-    node tools/golden.js --profile "$profile" --out "$tmp" "$seed" >/dev/null || { ok=1; continue; }
-    if cmp -s "$tmp/$profile-seed-$seed.jsonl" "golden/$profile-seed-$seed.jsonl"; then
-      echo "reference_selfcheck: $profile-seed-$seed byte-identical"
-    else
-      echo "reference_selfcheck: FAIL — $profile-seed-$seed differs from golden" >&2; ok=1
-    fi
-  done
-  rm -rf "$tmp"
-  return $ok
 }
 
 # compare.js must PASS a golden against itself AND FAIL on a planted
@@ -104,8 +97,6 @@ compare_selftest() {
   rm -rf "$tmp"; return 1
 }
 
-# ---- C++ port (ROADMAP P1) --------------------------------------------------
-
 # Release build into build/ (Command Line Tools: Unix Makefiles only). The
 # build dir is absolute because the agent sandbox resets cwd between calls,
 # and a relative `cmake --build build` can silently build nothing.
@@ -123,21 +114,30 @@ cpp_build() {
   echo "cpp_build: ok (Release)"
 }
 
-# Unit vectors: RNG, hash32, ruleStr, screen, growth. tests/vectors.js and
-# build/culture_vectors print the same lines with doubles as raw bit
-# patterns, so any difference at all is a parity break.
+# Unit vectors: RNG, hash32, ruleStr, screen, growth, pow, log2 — the C++
+# output must equal tests/vectors.expected (proven equal to the JS at the
+# hand-over; doubles printed as raw bit patterns).
 cpp_vectors() {
   local d
-  if d="$(diff <(node tests/vectors.js) <("$PWD/build/culture_vectors"))"; then
-    echo "cpp_vectors: ok ($(node tests/vectors.js | wc -l | tr -d ' ') vectors bit-identical to JS)"
+  if d="$(diff tests/vectors.expected <("$PWD/build/culture_vectors"))"; then
+    echo "cpp_vectors: ok ($(wc -l < tests/vectors.expected | tr -d ' ') vectors bit-identical to pinned)"
   else
-    echo "cpp_vectors: FAIL — C++ differs from the JS reference:" >&2; printf '%s\n' "$d" | head -20 >&2; return 1
+    echo "cpp_vectors: FAIL — C++ differs from tests/vectors.expected:" >&2; printf '%s\n' "$d" | head -20 >&2; return 1
   fi
 }
 
-# Full-length C++ traces through tools/compare.js. --float-rel 0: record and
-# lastMax have matched to all 10 printed digits since the port landed, so the
-# tolerance compare.js allows is not needed and is not granted here.
+# fdlibm sin/cos (core/src/fdlibm.hpp, D-027): one hash over 2.24M values,
+# pinned. On CI this is a cross-toolchain check of the explicit-fma port.
+cpp_trig() {
+  local want got
+  want="$(cat tests/trig.expected)"
+  got="$("$PWD/build/culture_vectors" --trig)"
+  [ "$got" = "$want" ] || { echo "cpp_trig: FAIL — C++ fdlibm '$got' != pinned '$want'" >&2; return 1; }
+  echo "cpp_trig: ok (2.24M cos/sin values = pinned)"
+}
+
+# Golden traces through tools/compare.js, with no float tolerance. compare.js
+# skips the header and checks every generation plus the births footer.
 # Args: "<profile> <seed>" pairs.
 cpp_parity() {
   local tmp ok=0 pair profile seed out
@@ -155,56 +155,40 @@ cpp_parity() {
   return $ok
 }
 
-# Which fdlibm flavor this node's V8 runs for Math.sin/cos ("fma" on Apple
-# Silicon, "plain" on baseline x86-64; D-027). The C++ always reproduces the
-# fma flavor, so JS-vs-C++ trig checks only apply where node is "fma".
-trig_flavor() { node tests/trig_flavor.js; }
-
-# fdlibm sin/cos (core/src/fdlibm.hpp). The C++ hash is pinned in
-# tests/trig.expected on EVERY platform (proves the explicit-fma port is
-# toolchain-independent); node is compared too where it runs the same flavor.
-cpp_trig() {
-  local want got js flavor
-  want="$(cat tests/trig.expected)"
-  got="$("$PWD/build/culture_vectors" --trig)"
-  [ "$got" = "$want" ] || { echo "cpp_trig: FAIL — C++ fdlibm '$got' != pinned '$want'" >&2; return 1; }
-  flavor="$(trig_flavor)"
-  if [ "$flavor" = fma ]; then
-    js="$(node tests/trig.js)"
-    [ "$js" = "$want" ] || { echo "cpp_trig: FAIL — node (fma flavor) '$js' != pinned '$want'" >&2; return 1; }
-    echo "cpp_trig: ok (C++ = pinned = node's V8, 2.24M cos/sin values)"
-  else
-    echo "cpp_trig: ok (C++ = pinned); node here is the '$flavor' fdlibm flavor, so the JS-side trig check is n/a"
-  fi
-}
-
-# Deep-state parity (D-025): per-generation hashes of the hidden per-site
-# arrays, the sound stats, the internal scalars (raw bits), and retreat and
-# search state, JS vs C++. The goldens hash only alive/tier; a planted `0.8f`
-# in the pressure decay passed all four of them and this caught it at gen 866.
-# "chaos" covers what the goldens never run: a 37x23 world, sliced search,
-# forceEmerge, frequent sparks, mutations and extinctions.
-# Both outputs must have exactly <gens> lines: two empty outputs (e.g. both
-# sides rejecting their arguments) would otherwise diff as "identical".
-# Args: "<profile> <seed> <gens>" triples.
-cpp_deep() {
-  local ok=0 t profile seed gens d js cc mask=() note=""
-  if [ "$(trig_flavor)" != fma ]; then mask=(--mask-trig); note=" (trig stats masked: node is not the fma flavor)"; fi
+# Deep parity against the pinned deep goldens, for one core ("opt" = the
+# optimized culture::World, "ref" = the frozen naive core_ref). The goldens
+# hash only alive/tier; a planted `0.8f` in the pressure decay passed all of
+# them and this caught it at gen 866 (D-025). The output must have exactly
+# <gens> lines: an empty output would otherwise "match" nothing at all.
+# Args: core, then "<profile> <seed> <gens>" triples.
+deep_check() {
+  local core="$1" ok=0 t profile seed gens d out g
+  shift
   for t in "$@"; do
     read -r profile seed gens <<<"$t"
-    js="$(node tests/deep.js "$profile" "$seed" "$gens")"
-    cc="$("$PWD/build/culture_trace" --deep --profile "$profile" --gens "$gens" ${mask[@]+"${mask[@]}"} "$seed")"
-    if [ "$(printf '%s\n' "$js" | wc -l | tr -d ' ')" != "$gens" ] || [ "$(printf '%s\n' "$cc" | wc -l | tr -d ' ')" != "$gens" ]; then
-      echo "cpp_deep: FAIL $profile-seed-$seed — expected $gens lines from each side" >&2; ok=1; continue
+    g="golden/deep/$profile-seed-$seed.txt"
+    out="$("$PWD/build/culture_trace" --deep --core "$core" --profile "$profile" --gens "$gens" "$seed")"
+    if [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" != "$gens" ]; then
+      echo "deep[$core]: FAIL $profile-seed-$seed — expected $gens lines" >&2; ok=1; continue
     fi
-    if d="$(diff <(printf '%s\n' "$js") <(printf '%s\n' "$cc"))"; then
-      echo "cpp_deep: $profile-seed-$seed hidden state bit-identical for $gens gens$note"
+    if d="$(diff "$g" <(printf '%s\n' "$out"))"; then
+      echo "deep[$core]: $profile-seed-$seed hidden state = pinned for $gens gens"
     else
-      echo "cpp_deep: FAIL $profile-seed-$seed — first divergence (columns: tests/deep.js):" >&2
+      echo "deep[$core]: FAIL $profile-seed-$seed — first divergence (columns: trace/main.cpp runDeep):" >&2
       printf '%s\n' "$d" | head -4 >&2; ok=1
     fi
   done
   return $ok
+}
+
+# Determinism and never-repeat (tests/properties.cpp).
+cpp_props() {
+  local out
+  if out="$("$PWD/build/culture_properties")"; then
+    printf '%s\n' "$out" | sed 's/^/cpp_props: /'
+  else
+    printf '%s\n' "$out" | sed 's/^/cpp_props: /' >&2; return 1
+  fi
 }
 
 # P1 acceptance 2: a 440x280 world steps in < 4 ms (Release). Mean over 4000
@@ -231,12 +215,13 @@ fast() {
   structure_gate   || ok=1
   golden_pin_gate  || ok=1
   compare_selftest || ok=1
-  reference_selfcheck "default 1" || ok=1   # ~6 s; the other three run in full
   if cpp_build; then
     cpp_vectors || ok=1
     cpp_trig || ok=1
     cpp_parity "default 1" || ok=1
-    cpp_deep "default 1 3000" "chaos 7 4000" || ok=1
+    deep_check opt "default 1 3000" "chaos 7 4000" || ok=1
+    deep_check ref "default 1 3000" "chaos 7 4000" || ok=1
+    cpp_props || ok=1
   else
     ok=1
   fi
@@ -247,9 +232,9 @@ full() {
   fast || return $?
   # ---- Layer-E: the whole gate. Run before closing a queue item. -----------
   local ok=0
-  reference_selfcheck "default 2" "default 3" "stress 4" || ok=1   # ~25 s
   cpp_parity "default 2" "default 3" "stress 4" || ok=1
-  cpp_deep "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" || ok=1
+  deep_check opt "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" || ok=1
+  deep_check ref "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" || ok=1
   cpp_bench || ok=1
   return $ok
 }

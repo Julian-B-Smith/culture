@@ -1,119 +1,20 @@
-// Port of reference/core.js. Section numbers refer to docs/handoff/SPEC.md.
-//
-// Precision rules applied throughout (SPEC §1):
-//  - All arithmetic is in double, constants included (`0.8`, never `0.8f`).
-//  - A float32 array element is rounded exactly when it is STORED, and every
-//    later read sees the stored float32. Compound updates like JS
-//    `pr[i] *= 0.8` are therefore written `pr[i] = float(double(pr[i]) * 0.8)`,
-//    and two consecutive stores round twice, as the JS does.
-//  - Every rng() call the JS makes is made here in the same order, including
-//    draws whose results are discarded (SPEC §2).
-#include "culture/core.hpp"
+// core_ref implementation: see core/ref/core_ref.hpp for why it exists and
+// the rule that it stays naive. Generated 2026-10-02 from core.cpp by undoing
+// D-026's two hot-loop optimizations (single-tier neighborhood skips, local
+// pointers, branch-free stats, wrap tables, reused scratch buffers).
+#include "core_ref.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
-#include "fdlibm.hpp"
+#include "../src/fdlibm.hpp"
 
-// Parity depends on IEEE double semantics (SPEC §1). A consumer that compiles
-// this file with -ffast-math would silently break every golden, and no gate
-// would see it if that consumer's build bypasses ours (critic M3, 2026-10-02).
 #ifdef __FAST_MATH__
-#error "libculture must not be compiled with -ffast-math (breaks bit-exact parity)"
+#error "core_ref must not be compiled with -ffast-math (breaks bit-exact parity)"
 #endif
 
-namespace culture {
-
-const char* const kElements[6] = {"ash", "ember", "gold", "moss", "tide", "violet"};
-
-uint32_t hash32(const std::vector<uint32_t>& vals) {
-  uint32_t h = 2166136261u;
-  for (uint32_t v : vals)
-    for (int k = 0; k < 4; k++) { h ^= (v >> (k * 8)) & 255u; h *= 16777619u; }
-  return h;
-}
-
-double pow15(double x) {
-  // Double-double: s = sqrt(x) is correctly rounded (IEEE); the residual
-  // x - s*s is exact by fma, so s + e/(2s) carries sqrt(x) to ~2^-105; the
-  // product x*(s + s_lo) is formed with an fma error term and rounded once.
-  if (x == 0) return 0;
-  const double s = std::sqrt(x);
-  const double e = std::fma(-s, s, x);
-  const double slo = e / (2 * s);
-  const double hi = x * s;
-  const double lo = std::fma(x, s, -hi) + x * slo;
-  return hi + lo;
-}
-
-std::string ruleStr(Rule r) {
-  std::string b, s;
-  for (int n = 0; n < 9; n++) {
-    if ((r.born >> n) & 1) b += char('0' + n);
-    if ((r.survive >> n) & 1) s += char('0' + n);
-  }
-  return "B" + b + "/S" + s;
-}
-
-ScreenResult screen(Rule rule, Rng& rng) {
-  constexpr int N = 48;
-  std::vector<uint8_t> A(N * N), B(N * N);
-  uint8_t *a = A.data(), *b = B.data();
-  long act = 0;
-  for (int i = 0; i < N * N; i++) a[i] = rng() < 0.35 ? 1 : 0;
-  for (int t = 0; t < 280; t++) {
-    int changed = 0;
-    for (int y = 0; y < N; y++) {
-      const int ym = ((y + N - 1) % N) * N, y0 = y * N, yp = ((y + 1) % N) * N;
-      for (int x = 0; x < N; x++) {
-        const int xm = (x + N - 1) % N, xp = (x + 1) % N;
-        const int n = a[ym + xm] + a[ym + x] + a[ym + xp] + a[y0 + xm] + a[y0 + xp] + a[yp + xm] + a[yp + x] + a[yp + xp];
-        const uint8_t al = a[y0 + x];
-        const uint8_t nx = al ? (rule.survive >> n) & 1 : (rule.born >> n) & 1;
-        b[y0 + x] = nx;
-        if (nx != al) changed++;
-      }
-    }
-    std::swap(a, b);
-    if (t >= 250) act += changed;
-    if (t == 80 && (changed == 0 || changed > 0.4 * N * N)) return {0, 0, false};
-  }
-  long sum = 0;
-  for (int i = 0; i < N * N; i++) sum += a[i];
-  const double density = double(sum) / (N * N), activity = double(act) / (30.0 * N * N);
-  return {density, activity, density > 0.04 && density < 0.5 && activity > 0.01 && activity < 0.2};
-}
-
-double growth(Rule rule, Rng& rng, double limit) {
-  constexpr int N = 96, c0 = N / 2, T = 60;
-  std::vector<uint8_t> A(N * N), B(N * N);
-  uint8_t *a = A.data(), *b = B.data();
-  for (int y = -3; y < 3; y++)
-    for (int x = -3; x < 3; x++) a[(c0 + y) * N + c0 + x] = rng() < 0.45 ? 1 : 0;
-  auto radius = [&] {
-    int r = 0;
-    for (int y = 0; y < N; y++)
-      for (int x = 0; x < N; x++)
-        if (a[y * N + x]) r = std::max(r, std::max(std::abs(x - c0), std::abs(y - c0)));
-    return r;
-  };
-  for (int t = 0; t < T; t++) {
-    // The JS also guards `limit !== undefined`; every caller passes one.
-    if (t % 10 == 9 && double(radius() - 3) > limit * T + 2) return 1;
-    // Border cells (x or y at 0 or N-1) are never written, so b keeps whatever
-    // it held — zeros, since the seed patch never reaches the border in 60 gens.
-    for (int y = 1; y < N - 1; y++) {
-      const int ym = (y - 1) * N, y0 = y * N, yp = (y + 1) * N;
-      for (int x = 1; x < N - 1; x++) {
-        const int n = a[ym + x - 1] + a[ym + x] + a[ym + x + 1] + a[y0 + x - 1] + a[y0 + x + 1] + a[yp + x - 1] + a[yp + x] + a[yp + x + 1];
-        b[y0 + x] = a[y0 + x] ? (rule.survive >> n) & 1 : (rule.born >> n) & 1;
-      }
-    }
-    std::swap(a, b);
-  }
-  return double(std::max(0, radius() - 3)) / T;
-}
+namespace culture::ref {
 
 namespace {
 void genome(Rng& rng, uint8_t el, Tier& t) {
@@ -126,31 +27,6 @@ void genome(Rng& rng, uint8_t el, Tier& t) {
   }
 }
 }  // namespace
-
-// Exact doubles of the JS profile values (tools/golden.js PARAMS). The three
-// half-life factors are 0.5^(1/10^v) evaluated by V8; the hex literals pin
-// V8's results so the platform pow never enters.
-Params defaultParams() {
-  Params p;
-  p.noise = 0x1.3a92a30553261p-12;     // 3/10000
-  p.hold = 4; p.hardness = 3;
-  p.memory = 0x1.fd305187b6ca4p-1;     // 0.5^(1/10^2.1)
-  p.forget = 0x1.fa67f85c132acp-1;     // 0.5^(1/10^1.8)
-  p.patience = 0x1.ffdbd60983ca5p-1;   // 0.5^(1/10^3.4)
-  p.margin = 0.04; p.maxSpeed = 0.30; p.gain = 0.25; p.crowding = 0.5; p.mutation = 1.0;
-  p.spark = 0x1.a36e2eb1c432dp-14;     // 10/100000
-  p.reactions = true;
-  p.warmup = 300; p.extinction = 200; p.retreat = 400; p.sparkCooldown = 1500;
-  return p;
-}
-
-Params stressParams() {
-  Params p = defaultParams();
-  p.spark = 0x1.0624dd2f1a9fcp-11;     // 50/100000
-  p.mutation = 3.0;
-  p.crowding = 0;
-  return p;
-}
 
 World::World(int W_, int H_, uint32_t seed_) : W(W_), H(H_), seed(seed_), rng(seed_) {
   // Birth discs wrap with `(c + d + H) % H` for |d| <= 6, which goes negative
@@ -176,10 +52,6 @@ World::World(int W_, int H_, uint32_t seed_) : W(W_), H(H_), seed(seed_), rng(se
   constexpr double kTau = 2 * 3.14159265358979323846;  // JS 2 * Math.PI
   for (int x = 0; x < W; x++) { cosX_.push_back(fdlibm::cos(kTau * x / W)); sinX_.push_back(fdlibm::sin(kTau * x / W)); }
   for (int y = 0; y < H; y++) { cosY_.push_back(fdlibm::cos(kTau * y / H)); sinY_.push_back(fdlibm::sin(kTau * y / H)); }
-  // Torus wrap tables: the step's three full-grid passes index neighbors
-  // through these instead of `%` (PORT_PLAN perf notes; results unchanged).
-  for (int x = 0; x < W; x++) { colM_.push_back((x + W - 1) % W); colP_.push_back((x + 1) % W); }
-  for (int y = 0; y < H; y++) { rowM_.push_back(((y + H - 1) % H) * W); rowP_.push_back(((y + 1) % H) * W); }
 }
 
 void World::resetFrontierStats() {
@@ -225,59 +97,35 @@ std::optional<Event> World::step(const Params& p) {
   stats.contest.assign(T, 0); stats.wall.assign(T, 0);
   uint16_t* tr = tier.data();
   uint8_t* hm = harm.data();
-  // Hot loop. Everything it touches goes through a local pointer: writes to
-  // uint8_t arrays may alias anything, so member access (stats.x[...],
-  // tiers[...]) would be reloaded from `this` on every cell.
-  std::vector<uint16_t> bornT(T), survT(T);
-  for (int t = 0; t < T; t++) { bornT[t] = tiers[t].rule.born; survT[t] = tiers[t].rule.survive; }
-  const uint16_t *bornR = bornT.data(), *survR = survT.data(), *bornF = bornFed.data(), *survF = survFed.data();
-  const uint8_t *elT = el.data(), *feedT = feedOn.data();
-  uint32_t *liveT = stats.live.data(), *moveT = stats.move.data(), *fedT = stats.fed.data();
-  double *cosT = stats.cos.data(), *sinT = stats.sin.data(), *cosYT = stats.cosY.data(), *sinYT = stats.sinY.data();
-  const double *cx = cosX_.data(), *sx = sinX_.data();
-  const int *colM = colM_.data(), *colP = colP_.data();
-  const bool hyst = p.gain > 0, reactions = p.reactions;
-  const double gain = p.gain, forget = p.forget;
   for (int y = 0; y < H; y++) {
-    const int ym = rowM_[y], y0 = y * W, yp = rowP_[y];
-    const uint8_t *am = a + ym, *a0 = a + y0, *ap = a + yp;
-    const uint16_t *tm = tr + ym, *t0 = tr + y0, *tp = tr + yp;
-    const double cy = cosY_[y], sy = sinY_[y];
+    const int ym = ((y + H - 1) % H) * W, y0 = y * W, yp = ((y + 1) % H) * W;
     for (int x = 0; x < W; x++) {
-      const int xm = colM[x], xp = colP[x];
-      const int c = am[xm] + am[x] + am[xp] + a0[xm] + a0[xp] + ap[xm] + ap[x] + ap[xp];
-      const int i = y0 + x, ti = t0[x], ai = a0[x];
-      const int fm = reactions ? feedT[ti] : 0;
+      const int xm = (x + W - 1) % W, xp = (x + 1) % W;
+      const int c = a[ym + xm] + a[ym + x] + a[ym + xp] + a[y0 + xm] + a[y0 + xp] + a[yp + xm] + a[yp + x] + a[yp + xp];
+      const int i = y0 + x, ti = tr[i];
+      const Rule r = tiers[ti].rule;
+      int nx;
+      const int fm = p.reactions ? feedOn[ti] : 0;
       bool fed = false;
-      // Feeding needs a live neighbor of ANOTHER tier, so a single-tier
-      // neighborhood (the common, predictable case) skips the scan. The scan
-      // draws no randomness, so skipping it cannot shift the RNG stream.
-      if (fm && ((tm[xm] != ti) | (tm[x] != ti) | (tm[xp] != ti) | (t0[xm] != ti) | (t0[xp] != ti) |
-                 (tp[xm] != ti) | (tp[x] != ti) | (tp[xp] != ti))) {
-        const int nbr[8] = {ym + xm, ym + x, ym + xp, y0 + xm, y0 + xp, yp + xm, yp + x, yp + xp};
+      if (fm) {
+        nb[0] = ym + xm; nb[1] = ym + x; nb[2] = ym + xp; nb[3] = y0 + xm; nb[4] = y0 + xp; nb[5] = yp + xm; nb[6] = yp + x; nb[7] = yp + xp;
         for (int k = 0; k < 8; k++) {
-          const int j = nbr[k], tj = tr[j];
-          if (a[j] && tj != ti && ((fm >> elT[tj]) & 1)) { fed = true; break; }
+          const int j = nb[k], tj = tr[j];
+          if (a[j] && tj != ti && ((fm >> el[tj]) & 1)) { fed = true; break; }
         }
       }
-      const unsigned mask = fed ? (ai ? survF[ti] : bornF[ti]) : (ai ? survR[ti] : bornR[ti]);
-      fedT[ti] += fed;
-      int nx = (mask >> c) & 1;
-      // Hysteresis: one draw, and only when this harm category repeats.
-      if (ai && !nx && hyst) {
+      if (fed) { nx = a[i] ? (survFed[ti] >> c) & 1 : (bornFed[ti] >> c) & 1; stats.fed[ti]++; }
+      else nx = a[i] ? (r.survive >> c) & 1 : (r.born >> c) & 1;
+      if (a[i] && !nx && p.gain > 0) {
         const int cat = c + 1;
         if (hm[i] == cat && rng() < double(res[i])) nx = 1;
-        else { res[i] = float(hm[i] == cat ? std::min(1.0, double(res[i]) + gain) : gain); hm[i] = uint8_t(cat); }
+        else { res[i] = float(hm[i] == cat ? std::min(1.0, double(res[i]) + p.gain) : p.gain); hm[i] = uint8_t(cat); }
       }
-      res[i] = float(double(res[i]) * forget);
+      res[i] = float(double(res[i]) * p.forget);
       b[i] = uint8_t(nx);
-      // Branch-free stats: adding nx*v where nx = 0 adds +/-0.0, which leaves
-      // any double sum unchanged, so this equals the JS `if (nx)` form.
-      const double fx = nx;
-      liveT[ti] += nx; cosT[ti] += fx * cx[x]; sinT[ti] += fx * sx[x]; cosYT[ti] += fx * cy; sinYT[ti] += fx * sy;
-      const int moved = nx != ai;
-      moveT[ti] += moved;
-      if (ti == F) { frontierLive += nx; motion += moved; }
+      if (nx) { stats.live[ti]++; stats.cos[ti] += cosX_[x]; stats.sin[ti] += sinX_[x]; stats.cosY[ti] += cosY_[y]; stats.sinY[ti] += sinY_[y]; }
+      if (nx != a[i]) stats.move[ti]++;
+      if (ti == F) { frontierLive += nx; if (nx != a[i]) motion++; }
     }
   }
   // 2. Noise, then swap buffers.
@@ -288,22 +136,16 @@ std::optional<Event> World::step(const Params& p) {
 
   // 3. Territory.
   float *pr = pressure.data(), *wl = wall.data();
-  std::vector<int>& claims = claims_;
-  claims.clear();
+  std::vector<int> claims;
   int sparkSite = -1, sparkPair[2] = {0, 0};
   for (int y = 0; y < H; y++) {
-    const int ym = rowM_[y], y0 = y * W, yp = rowP_[y];
+    const int ym = ((y + H - 1) % H) * W, y0 = y * W, yp = ((y + 1) % H) * W;
     for (int x = 0; x < W; x++) {
       const int i = y0 + x, t = tr[i];
-      const int xm = colM_[x], xp = colP_[x];
+      const int xm = (x + W - 1) % W, xp = (x + 1) % W;
       int push = 0, m = -1;
-      // Pushing and sparking both need a neighbor of another tier; in a
-      // single-tier neighborhood the JS loop below does nothing (no RNG
-      // draw either), so it is skipped.
-      const bool mixed = (tr[ym + xm] != t) | (tr[ym + x] != t) | (tr[ym + xp] != t) | (tr[y0 + xm] != t) |
-                         (tr[y0 + xp] != t) | (tr[yp + xm] != t) | (tr[yp + x] != t) | (tr[yp + xp] != t);
       nb[0] = ym + xm; nb[1] = ym + x; nb[2] = ym + xp; nb[3] = y0 + xm; nb[4] = y0 + xp; nb[5] = yp + xm; nb[6] = yp + x; nb[7] = yp + xp;
-      for (int k = 0; mixed && k < 8; k++) {
+      for (int k = 0; k < 8; k++) {
         const int j = nb[k];
         if (!al[j]) continue;
         const int tj = tr[j];
@@ -392,14 +234,13 @@ std::optional<Event> World::step(const Params& p) {
   for (int k = 0; k < 512; k++) table[k] *= p.memory;
   tableTotal *= p.memory;
   float* sc = score.data();
-  std::vector<int>& codes = codes_;
-  codes.clear();
+  std::vector<int> codes;
   for (int y = 0; y < H; y++) {
-    const int ym = rowM_[y], y0 = y * W, yp = rowP_[y];
+    const int ym = ((y + H - 1) % H) * W, y0 = y * W, yp = ((y + 1) % H) * W;
     for (int x = 0; x < W; x++) {
       const int i = y0 + x;
       if (!al[i] || tr[i] != F) { sc[i] = 0; continue; }
-      const int xm = colM_[x], xp = colP_[x];
+      const int xm = (x + W - 1) % W, xp = (x + 1) % W;
       codes.push_back(i);
       codes.push_back(al[ym + xm] | al[ym + x] << 1 | al[ym + xp] << 2 | al[y0 + xm] << 3 | al[y0 + x] << 4 |
                       al[y0 + xp] << 5 | al[yp + xm] << 6 | al[yp + x] << 7 | al[yp + xp] << 8);
@@ -551,4 +392,4 @@ std::optional<Event> World::forceEmerge(const Params& p) {
   return emerge(lastArg, lastMax, p, nullptr, -1);
 }
 
-}  // namespace culture
+}  // namespace culture::ref

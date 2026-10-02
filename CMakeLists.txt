@@ -24,11 +24,19 @@ target_include_directories(culture PUBLIC core/include)
 # are written out explicitly in core/src/fdlibm.hpp.
 target_compile_options(culture PRIVATE -ffp-contract=off -fno-fast-math)
 
+# core_ref: the frozen naive core every optimized core must match (D-030).
+add_library(culture_ref core/ref/core_ref.cpp)
+target_link_libraries(culture_ref PUBLIC culture)
+target_compile_options(culture_ref PRIVATE -ffp-contract=off -fno-fast-math)
+
 add_executable(culture_trace trace/main.cpp)
-target_link_libraries(culture_trace PRIVATE culture)
+target_link_libraries(culture_trace PRIVATE culture_ref)  # brings culture too
 
 add_executable(culture_vectors tests/vectors.cpp)
 target_link_libraries(culture_vectors PRIVATE culture)
 # vectors.cpp includes core/src/fdlibm.hpp directly and needs the same guard.
 target_include_directories(culture_vectors PRIVATE core/src)
 target_compile_options(culture_vectors PRIVATE -ffp-contract=off -fno-fast-math)
+
+add_executable(culture_properties tests/properties.cpp)
+target_link_libraries(culture_properties PRIVATE culture)

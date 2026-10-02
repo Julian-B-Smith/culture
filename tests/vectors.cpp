@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     }
   }
   uint32_t hp = 2166136261u;
-  for (int k = 0; k <= 65536; k++) hp = fnvD(hp, std::pow(double(k), 1.5));
+  for (int k = 0; k <= 65536; k++) hp = fnvD(hp, pow15(double(k)));
   std::printf("pow15 0..65536 %u\n", hp);
   uint32_t hl = 2166136261u;
   Rng g(2026);
