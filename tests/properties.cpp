@@ -3,6 +3,7 @@
 // rule is ever used twice. Deterministic; prints one line per property and
 // exits nonzero on the first failure.
 #include <cstdio>
+#include <algorithm>
 #include <cstring>
 #include <set>
 #include <vector>
@@ -57,10 +58,36 @@ bool neverRepeat() {
   return births > 50;  // a property that never had a chance to fail proves nothing
 }
 
+// D-031 (P4 quirk #5): surprise windows wrap the torus, so a site on the
+// edge can be the centre of a birth. Plant a 5x5 block of score centred on
+// each corner and edge site in turn; the argmax must be exactly that site,
+// with the full sum (the reference could never pick these sites at all).
+bool windowWraps() {
+  const int W = 23, H = 17;
+  std::vector<float> score(W * H);
+  std::vector<uint16_t> tier(W * H, 0);
+  std::vector<double> scratch;
+  const int centres[][2] = {{0, 0}, {W - 1, 0}, {0, H - 1}, {W - 1, H - 1}, {1, 8}, {11, H - 2}, {11, 8}};
+  for (const auto& c : centres) {
+    std::fill(score.begin(), score.end(), 0.f);
+    for (int dy = -2; dy <= 2; dy++)
+      for (int dx = -2; dx <= 2; dx++) score[((c[1] + dy + H) % H) * W + (c[0] + dx + W) % W] = 1.f;
+    double best = 0;
+    const int arg = surpriseWindowMax(score.data(), tier.data(), 0, W, H, scratch, best);
+    if (arg != c[1] * W + c[0] || best != 25.0) {
+      std::printf("window-wrap: FAIL centre (%d,%d): got site %d sum %g\n", c[0], c[1], arg, best);
+      return false;
+    }
+  }
+  std::printf("window-wrap: ok (5x5 blocks centred on corners and edges are found exactly, sum 25)\n");
+  return true;
+}
+
 }  // namespace
 
 int main() {
   bool ok = determinism();
   ok = neverRepeat() && ok;
+  ok = windowWraps() && ok;
   return ok ? 0 : 1;
 }

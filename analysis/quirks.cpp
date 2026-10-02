@@ -53,6 +53,8 @@ struct Totals {
   long idxReuse = 0, idxReuseStaleSpark = 0;  // quirk 8
   long mutantElxDraws = 0;                      // quirk 6
   long complementUsed = 0;                      // screen: complement already used
+  long edgeBirths = 0;          // births centred within 2 cells of the edge (impossible before D-031)
+  long revertBelow = 0, revertOther = 0;  // retreating cells: to idx-1 vs to another (previous) owner
   long b2Births = 0;
   std::vector<TierLife> lives;
 };
@@ -64,7 +66,13 @@ void runOne(uint32_t seed, int gens, const Params& p, Totals& T) {
   const int n = w.W * w.H;
   for (int g = 0; g < gens; g++) {
     const int tiersBefore = int(w.tiers.size());
+    const int dyingIdx = w.retreat ? w.retreat->tier : -1;
+    std::vector<uint16_t> before;
+    if (dyingIdx >= 0) before = w.tier;
     std::optional<Event> e1 = w.step(p);
+    if (dyingIdx >= 0)
+      for (int i = 0; i < n; i++)
+        if (before[i] == dyingIdx && w.tier[i] != dyingIdx) (w.tier[i] == dyingIdx - 1 ? T.revertBelow : T.revertOther)++;
     T.gens++;
     if (w.retreat || (e1 && e1->kind == Event::Extinct)) T.retreatGens++;
     if (e1 && e1->kind == Event::Searching && e1->spark) T.skipSurpriseGens++;
@@ -109,12 +117,15 @@ void runOne(uint32_t seed, int gens, const Params& p, Totals& T) {
       else T.surprise++;
       if (extinctIdx.count(t.idx)) {
         T.idxReuse++;
-        // A stale sparkLast entry keyed on this index belongs to the extinct
-        // tier, but the new tier inherits its cooldown (quirk 8).
+        // Since D-031 sparkLast is keyed by birth serials (high 32 bits = the
+        // smaller serial), so a newborn can only inherit a cooldown if some key
+        // already names ITS serial. Before D-031 keys were index pairs and this
+        // counted 1 inherited cooldown in 400k gens.
         for (const auto& [key, when] : w.sparkLast)
-          if (key / 4096 == t.idx || key % 4096 == t.idx) { T.idxReuseStaleSpark++; break; }
+          if ((key >> 32) == t.serial || (key & 0xffffffffu) == t.serial) { T.idxReuseStaleSpark++; break; }
       }
       if (w.usedRules.count(complement(t.rule).key()) && complement(t.rule).key() != t.rule.key()) T.complementUsed++;
+      if (t.origin[0] < 2 || t.origin[0] >= w.W - 2 || t.origin[1] < 2 || t.origin[1] >= w.H - 2) T.edgeBirths++;
       const bool b2 = (t.rule.born >> 2) & 1;
       if (b2) T.b2Births++;
       lifeOf[t.serial] = T.lives.size();
@@ -125,7 +136,6 @@ void runOne(uint32_t seed, int gens, const Params& p, Totals& T) {
       if (it != lifeOf.end()) T.lives[it->second].maxCells = std::max(T.lives[it->second].maxCells, t.cells);
     }
   }
-  (void)n;
 }
 
 double pct(double a, double b) { return b > 0 ? 100.0 * a / b : 0; }
@@ -153,8 +163,8 @@ int main(int argc, char** argv) {
               profile.c_str(), seeds.size(), gens, T.gens);
   std::printf("births %ld (surprise %ld, spark %ld, mutation %ld); extinctions %ld\n",
               T.births, T.surprise, T.spark, T.mutation, T.extinctions);
-  std::printf("Q1 retreat to idx-1: %ld/%ld retreats revert to a tier that is NOT the dying tier's parent; "
-              "%ld of %ld retreating cells (%.1f%%) go to a non-parent\n",
+  std::printf("Q1 lineage: %ld/%ld dying tiers have a parent other than idx-1; "
+              "%ld of %ld cells in their territory (%.1f%%)\n",
               T.retreatWrongParent, T.extinctions ? T.extinctions : 0, T.retreatWrongParentCells, T.retreatCellsTotal,
               pct(T.retreatWrongParentCells, T.retreatCellsTotal));
   std::printf("Q2 steps that skip the surprise pass: retreat %ld (%.2f%% of gens), spark/mutation trigger %ld\n",
@@ -163,7 +173,9 @@ int main(int argc, char** argv) {
               "fires for L gens per search under deterministic latency L\n");
   std::printf("Q4 failed searches (800 candidates, record *= 1.05): %ld (%ld of them mutant); cancelled: %ld\n",
               T.failedSearches, T.failedMutantSearches, T.cancelledSearches);
-  std::printf("Q5 surprise window excludes the 2-cell border: %.2f%% of sites can never be a surprise birth site\n", 100 * border);
+  std::printf("Q5 2-cell edge band = %.2f%% of sites; births centred there: %ld of %ld (zero means the band is excluded)\n",
+              100 * border, T.edgeBirths, T.births);
+  std::printf("Q1' retreating cells handed to idx-1: %ld, to another (previous) owner: %ld\n", T.revertBelow, T.revertOther);
   std::printf("Q6 elx drawn for mutants: %ld wasted search-stream draws (one per mutant birth, plus rerolls)\n", T.mutantElxDraws);
   std::printf("Q8 tier index reuse: %ld births reuse an extinct index; %ld of those inherit a stale sparkLast cooldown\n",
               T.idxReuse, T.idxReuseStaleSpark);

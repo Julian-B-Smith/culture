@@ -115,6 +115,38 @@ double growth(Rule rule, Rng& rng, double limit) {
   return double(std::max(0, radius() - 3)) / T;
 }
 
+int surpriseWindowMax(const float* score, const uint16_t* tier, int F, int W, int H,
+                      std::vector<double>& integral, double& best) {
+  // Wrapped grid: padded column px / row py read score at (px-2, py-2) mod
+  // (W, H), so the window centred on site (x, y) is padded centre (x+2, y+2).
+  constexpr int R = 2;
+  const int PW = W + 2 * R, PH = H + 2 * R, W1 = PW + 1;
+  // Row 0 and column 0 must be zero and are never written below; every
+  // other entry is overwritten, so allocate once instead of clearing per step.
+  if (integral.size() != size_t(W1) * (PH + 1)) integral.assign(size_t(W1) * (PH + 1), 0.0);
+  double* I = integral.data();
+  for (int py = 0; py < PH; py++) {
+    const float* row = score + size_t((py - R + H) % H) * W;
+    double sum = 0;
+    for (int px = 0; px < PW; px++) {
+      sum += double(row[(px - R + W) % W]);
+      I[(py + 1) * W1 + px + 1] = I[py * W1 + px + 1] + sum;
+    }
+  }
+  best = 0;
+  int arg = -1;
+  for (int y = 0; y < H; y++)
+    for (int x = 0; x < W; x++) {
+      const int i = y * W + x;
+      if (tier[i] != F) continue;
+      // Padded centre (x+R, y+R): A=(y+2R+1, x+2R+1) B=(y, x+2R+1) C=(y+2R+1, x) D=(y, x).
+      const double s = I[(y + 2 * R + 1) * W1 + x + 2 * R + 1] - I[y * W1 + x + 2 * R + 1] -
+                       I[(y + 2 * R + 1) * W1 + x] + I[y * W1 + x];
+      if (s > best) { best = s; arg = i; }
+    }
+  return arg;
+}
+
 namespace {
 void genome(Rng& rng, uint8_t el, Tier& t) {
   t.el = el;
@@ -162,6 +194,7 @@ World::World(int W_, int H_, uint32_t seed_) : W(W_), H(H_), seed(seed_), rng(se
   alive.assign(n, 0); next.assign(n, 0); tier.assign(n, 0);
   pressure.assign(n, 0.f); wall.assign(n, 0.f); harm.assign(n, 0); resist.assign(n, 0.f);
   claimed.assign(n, 0); score.assign(n, 0.f);
+  prevTier.assign(n, 0); prevSerial.assign(n, 0);  // everything starts as tier 0 (serial 0)
   integral.assign(size_t(W + 1) * (H + 1), 0.0);
   Tier t0;
   t0.idx = 0; t0.rule = kConway; t0.cells = uint32_t(n); t0.speed = 0.25;
@@ -213,7 +246,8 @@ std::optional<Event> World::step(const Params& p) {
       const bool upward = a2 > b2 && !(p.reactions && B.react[A.el] == PUSH);
       const bool back = p.reactions && A.react[B.el] == PUSH;
       canPush[a2 * T + b2] = a2 != dying && (upward || back) ? 1 : 0;
-      const int32_t key = std::min(a2, b2) * 4096 + std::max(a2, b2);
+      const uint64_t sa = A.serial, sb = B.serial;
+      const uint64_t key = std::min(sa, sb) << 32 | std::max(sa, sb);
       auto it = sparkLast.find(key);
       const double last = it == sparkLast.end() ? -1e9 : double(it->second);
       const bool ready = double(gen) - last > p.sparkCooldown && double(frontierAge) > warmPrev / 2;
@@ -327,18 +361,25 @@ std::optional<Event> World::step(const Params& p) {
   }
   for (size_t k = 0; k < claims.size(); k += 2) {
     const int i = claims[k];
+    prevTier[i] = tr[i]; prevSerial[i] = tiers[tr[i]].serial;
     tr[i] = uint16_t(claims[k + 1]); pr[i] = 0; wl[i] = 0; hm[i] = 0; res[i] = 0; claimed[i] = gen;
   }
-  // 4. Retreat: an extinct tier gives its ground back in reverse claim order.
+  // 4. Retreat: an extinct tier gives its ground back in reverse claim order,
+  // each site to whoever held it before, while that owner lives; otherwise to
+  // the tier below (D-031; the reference always used the tier below).
   std::optional<Event> finished;
   if (retreat) {
     Retreat& rt = *retreat;
     rt.t++;
+    auto owner = [&](int i) {
+      const int q = prevTier[i];
+      return q < rt.tier && tiers[q].serial == prevSerial[i] ? q : rt.tier - 1;
+    };
     const double threshold = rt.from - (rt.from - rt.to + 1) * std::min(1.0, double(rt.t) / rt.dur);
     for (int i = 0; i < n; i++)
-      if (tr[i] == rt.tier && double(claimed[i]) >= threshold) { tr[i] = uint16_t(rt.tier - 1); pr[i] = 0; wl[i] = 0; }
+      if (tr[i] == rt.tier && double(claimed[i]) >= threshold) { tr[i] = uint16_t(owner(i)); pr[i] = 0; wl[i] = 0; }
     if (rt.t >= rt.dur) {
-      for (int i = 0; i < n; i++) if (tr[i] == rt.tier) tr[i] = uint16_t(rt.tier - 1);
+      for (int i = 0; i < n; i++) if (tr[i] == rt.tier) tr[i] = uint16_t(owner(i));
       Tier gone = tiers.back();
       tiers.pop_back();
       gone.hasExtinctAt = true; gone.extinctAt = gen; gone.dying = false;
@@ -369,12 +410,15 @@ std::optional<Event> World::step(const Params& p) {
   if (retreat || finished) { gen++; lastMax = 0; lastArg = -1; return finished; }
   if (sparkSite >= 0 && !search) {
     gen++;
-    sparkLast[sparkPair[0] * 4096 + sparkPair[1]] = gen;  // quirk 9: post-increment gen
+    // Quirk 9 (kept, D-031): the cooldown is stamped with the post-increment gen.
+    const uint64_t sa = tiers[sparkPair[0]].serial, sb = tiers[sparkPair[1]].serial;
+    sparkLast[std::min(sa, sb) << 32 | std::max(sa, sb)] = gen;
     return emerge(sparkSite, 0, p, sparkPair, -1);
   }
   if (!search && p.mutation > 0 && double(frontierAge) > warm) {
-    // reignTier is tiers[D] after the update above; the JS's own
-    // `D === tiers.indexOf(reignTier)` guard is therefore always true (quirk 7).
+    // The reference also checked `D === tiers.indexOf(reignTier)`, which is
+    // always true here (reignTier was just set to tiers[D]); P4 quirk #7,
+    // removed as dead code with no change in output (D-031).
     const int Dm = D;
     const double share = double(counts[Dm]) / n;
     const double reign = double(gen - reignStart) / meanEpoch;
@@ -409,21 +453,8 @@ std::optional<Event> World::step(const Params& p) {
   for (size_t k = 0; k < codes.size(); k += 2) sc[codes[k]] = float(-std::log2((table[codes[k + 1]] + 1) / denom));
   for (size_t k = 0; k < codes.size(); k += 2) table[codes[k + 1]] += 1;
   tableTotal += double(codes.size() / 2);
-  double* I = integral.data();
-  const int W1 = W + 1, R = 2;
-  for (int y = 0; y < H; y++) {
-    double row = 0;
-    for (int x = 0; x < W; x++) { row += double(sc[y * W + x]); I[(y + 1) * W1 + x + 1] = I[y * W1 + x + 1] + row; }
-  }
   double best = 0;
-  int arg = -1;
-  for (int y = R; y < H - R; y++)
-    for (int x = R; x < W - R; x++) {
-      const int i = y * W + x;
-      if (tr[i] != F) continue;
-      const double s = I[(y + R + 1) * W1 + x + R + 1] - I[(y - R) * W1 + x + R + 1] - I[(y + R + 1) * W1 + x - R] + I[(y - R) * W1 + x - R];
-      if (s > best) { best = s; arg = i; }
-    }
+  const int arg = surpriseWindowMax(sc, tr, F, W, H, integral, best);
   lastMax = best; lastArg = arg;
   frontierAge++; gen++;
 
@@ -539,6 +570,7 @@ std::optional<Event> World::work(const Params& p, int maxCandidates) {
     for (int dx = -rad; dx <= rad; dx++) {
       if (dx * dx + dy * dy > rad * rad) continue;
       const int i = ((s.cy + dy + H) % H) * W + (s.cx + dx + W) % W;
+      prevTier[i] = tier[i]; prevSerial[i] = tiers[tier[i]].serial;
       tier[i] = uint16_t(idx); harm[i] = 0; resist[i] = 0; wall[i] = 0; claimed[i] = gen;
       if (rr() < 0.35) alive[i] = 1;
     }
