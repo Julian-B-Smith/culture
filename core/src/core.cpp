@@ -34,6 +34,19 @@ uint32_t hash32(const std::vector<uint32_t>& vals) {
   return h;
 }
 
+double pow15(double x) {
+  // Double-double: s = sqrt(x) is correctly rounded (IEEE); the residual
+  // x - s*s is exact by fma, so s + e/(2s) carries sqrt(x) to ~2^-105; the
+  // product x*(s + s_lo) is formed with an fma error term and rounded once.
+  if (x == 0) return 0;
+  const double s = std::sqrt(x);
+  const double e = std::fma(-s, s, x);
+  const double slo = e / (2 * s);
+  const double hi = x * s;
+  const double lo = std::fma(x, s, -hi) + x * slo;
+  return hi + lo;
+}
+
 std::string ruleStr(Rule r) {
   std::string b, s;
   for (int n = 0; n < 9; n++) {
@@ -343,7 +356,7 @@ std::optional<Event> World::step(const Params& p) {
   for (int t = 0; t < TT; t++) if (double(counts[t]) >= n * 0.01 && !tiers[t].dying) act++;
   const int excess = std::max(0, act - 2);
   active = act;
-  brake = 1 / (1 + p.crowding * 0.6 * std::pow(double(excess), 1.5));
+  brake = 1 / (1 + p.crowding * 0.6 * pow15(double(excess)));  // portable x^1.5 (D-032)
   thresholdLift = 1 + p.crowding * 0.05 * excess;
   warm = p.warmup * (1 + p.crowding * excess);
   hasWarm = true;

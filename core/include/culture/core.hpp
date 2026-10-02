@@ -46,6 +46,14 @@ enum Element : uint8_t { ASH, EMBER, GOLD, MOSS, TIDE, VIOLET };
 extern const char* const kElements[6];
 enum Reaction : uint8_t { NONE = 0, PUSH = 1, FEED = 2, SPARK = 3 };
 
+// x^1.5, correctly rounded, the same bits on every platform (D-032). The
+// crowding brake needs excess^1.5; std::pow is not portable here: glibc and
+// macOS libm disagree for some integers in 0..65536, and macOS pow is not
+// correctly rounded at 89 of them (first k = 1018; checked with mpmath).
+// This version is (all k in 0..65536 checked), and equals macOS pow and V8 on
+// every value the simulation can reach (excess <= 98), so no golden moved.
+double pow15(double x);
+
 struct ScreenResult { double density = 0, activity = 0; bool ok = false; };
 // Edge-of-chaos screen on a 48x48 torus; consumes N*N draws up front.
 ScreenResult screen(Rule rule, Rng& rng);

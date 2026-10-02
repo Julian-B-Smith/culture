@@ -198,7 +198,7 @@ std::optional<Event> World::step(const Params& p) {
   for (int t = 0; t < TT; t++) if (double(counts[t]) >= n * 0.01 && !tiers[t].dying) act++;
   const int excess = std::max(0, act - 2);
   active = act;
-  brake = 1 / (1 + p.crowding * 0.6 * std::pow(double(excess), 1.5));
+  brake = 1 / (1 + p.crowding * 0.6 * pow15(double(excess)));  // portable x^1.5 (D-032)
   thresholdLift = 1 + p.crowding * 0.05 * excess;
   warm = p.warmup * (1 + p.crowding * excess);
   hasWarm = true;

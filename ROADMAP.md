@@ -146,6 +146,16 @@ hold **and** a `traces/` entry is written.
   Note: the repo is public from day one, so the code itself is already
   disclosed (D-021).
 
+### PD1 — Portable log2 (D-032 follow-up)
+- **Status:** open (ready; small)
+- **Why:** `std::log2` is the last platform libm call in the core. A 1-ulp
+  double difference between libms can, rarely, survive the float32 store and
+  make two platforms diverge over very long runs.
+- **Acceptance:** a correctly rounded log2 (e.g. CORE-MATH) in the core; its
+  outputs proven equal to the goldens and deep goldens (no re-pin needed, or
+  a recorded decision if some differ); `std::log2` gone from `core/`
+  (grep-gated).
+
 ### Backlog (unprioritized; the human orders these)
 WebAssembly build of libculture for a web viewer that runs the ONE canonical
 core (D-030; the JS prototype is frozen); scanner sound / instrument mode (tempo, scale quantization, MIDI/OSC); branching
