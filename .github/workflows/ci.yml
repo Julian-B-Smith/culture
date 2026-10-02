@@ -31,7 +31,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "lts/*"
-      # P1 adds: sudo apt-get install -y cmake build-essential
+      # C++ core (P1): ubuntu-latest ships cmake and g++; verify configures
+      # and builds Release itself. This also exercises parity on glibc libm
+      # and GCC, a second toolchain beside the local Apple clang.
       - name: verify fast
         run: |
           chmod +x verify
