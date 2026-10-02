@@ -15,12 +15,12 @@
 // The trig-derived stats column prints "-" when this node's V8 is the plain
 // fdlibm flavor (tests/trig_flavor.js); ./verify then masks the C++ side too.
 const path = require('path'), fs = require('fs');
-const Core = require(path.join(__dirname, '..', 'reference', 'core.js'));
+const Core = require(path.join(__dirname, '..', '..', 'reference', 'core.js'));
 const flavor = require(path.join(__dirname, 'trig_flavor.js'));
 const [profile, seed, gens] = [process.argv[2], +process.argv[3], +process.argv[4]];
 // Params come from a golden header: JSON prints doubles in shortest
 // round-trip form, so they parse back to the exact values golden.js used.
-const header = f => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'golden', f), 'utf8').split('\n', 1)[0]).params;
+const header = f => JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'golden', 'js-v1', f), 'utf8').split('\n', 1)[0]).params;
 const PROFILES = {
   default: { params: header('default-seed-1.jsonl'), W: 220, H: 140, slice: Infinity, force: 0 },
   stress: { params: header('stress-seed-4.jsonl'), W: 220, H: 140, slice: Infinity, force: 0 },

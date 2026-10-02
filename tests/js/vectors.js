@@ -4,7 +4,7 @@
 // Covers the pieces PORT_PLAN P1 asks to test in isolation: RNG, hash,
 // ruleStr, screen and growth (both pure given an RNG state).
 const path = require('path');
-const Core = require(path.join(__dirname, '..', 'reference', 'core.js'));
+const Core = require(path.join(__dirname, '..', '..', 'reference', 'core.js'));
 const bits = x => { const d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, x); return d.getBigUint64(0).toString(16).padStart(16, '0'); };
 const out = [];
 for (const seed of [0, 1, 42, 0xDEADBEEF, 0xFFFFFFFF]) {

@@ -2,7 +2,7 @@
 //
 //   culture_trace [--profile default|stress] [--out dir] [--gens N] seed...
 //   culture_trace --bench WxH [--gens N] [--seed S]
-//   culture_trace --deep [--profile default|stress|chaos] [--mask-trig] --gens N seed   (stdout)
+//   culture_trace --deep [--core opt|ref] [--profile default|stress|chaos] [--mask-trig] --gens N seed   (stdout)
 //
 // Trace mode writes <out>/<profile>-seed-<n>.jsonl in the golden format (a
 // header, one line per generation, a births footer) using INSTANT search:
@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "culture/core.hpp"
+#include "../core/ref/core_ref.hpp"
 
 using namespace culture;
 
@@ -145,9 +146,12 @@ DeepProfile deepProfile(const std::string& name) {
   return {defaultParams(), 220, 140, World::kUnlimited, 0};
 }
 
+// Templated over the core so the optimized World and the frozen naive
+// ref::World print the same lines (D-030: core_ref is the in-C++ oracle).
+template <class WorldT>
 int runDeep(const std::string& profile, int gens, uint32_t seed, bool maskTrig) {
   const DeepProfile P = deepProfile(profile);
-  World w(P.W, P.H, seed);
+  WorldT w(P.W, P.H, seed);
   auto h = [](const void* d, size_t len, uint32_t seedH = 2166136261u) {
     const uint8_t* b = static_cast<const uint8_t*>(d);
     for (size_t i = 0; i < len; i++) { seedH ^= b[i]; seedH *= 16777619u; }
@@ -210,7 +214,7 @@ int runBench(int W, int H, int gens, uint32_t seed) {
 
 int main(int argc, char** argv) {
   std::string profile = "default", out = "golden", bench;
-  bool deep = false, maskTrig = false;
+  bool deep = false, maskTrig = false, refCore = false;
   int gens = -1;
   uint32_t benchSeed = 1;
   std::vector<uint32_t> seeds;
@@ -226,6 +230,7 @@ int main(int argc, char** argv) {
     else if (a == "--bench") bench = val();
     else if (a == "--deep") deep = true;
     else if (a == "--mask-trig") maskTrig = true;
+    else if (a == "--core") { const std::string c = val(); if (c != "ref" && c != "opt") { std::fprintf(stderr, "--core ref|opt\n"); return 2; } refCore = c == "ref"; }
     else if (a == "--seed") benchSeed = uint32_t(std::strtoul(val().c_str(), nullptr, 10));
     else seeds.push_back(uint32_t(std::strtoul(a.c_str(), nullptr, 10)));
   }
@@ -237,7 +242,7 @@ int main(int argc, char** argv) {
   if (deep) {
     if (profile != "default" && profile != "stress" && profile != "chaos") { std::fprintf(stderr, "unknown profile %s\n", profile.c_str()); return 2; }
     if (seeds.size() != 1 || gens <= 0) { std::fprintf(stderr, "--deep needs --gens N and one seed\n"); return 2; }
-    return runDeep(profile, gens, seeds[0], maskTrig);
+    return refCore ? runDeep<ref::World>(profile, gens, seeds[0], maskTrig) : runDeep<World>(profile, gens, seeds[0], maskTrig);
   }
   if (profile != "default" && profile != "stress") { std::fprintf(stderr, "unknown profile %s\n", profile.c_str()); return 2; }
   // Same defaults as golden.js PROFILES.

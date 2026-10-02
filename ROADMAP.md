@@ -7,14 +7,15 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 ## Status
 
 - **Phase:** P4 — decide the quirks (current, chosen 2026-10-02). Done: P0, P1, PA0 (all 2026-10-02). P2 waits on the render-stack decision; PE1 is ready and independent.
-- **Oracle:** `fast` = kit gates, structure, golden sha256 pins, compare.js
-  self-test with a planted divergence, reference regenerates default-seed-1
-  byte-identically, C++ build + JS-vs-C++ vectors + fdlibm trig + C++
-  default-seed-1 vs golden + deep hidden-state parity (default 1, chaos 7).
-  `full` = fast + all four goldens (reference and C++) + deep parity on all
-  + chaos 11 + 440×280 bench. **Gap:** CI's node is the plain fdlibm flavor,
-  so there the JS-side trig check and trig stats in the deep line are n/a
-  (visible in the output, D-027); everything else runs on both platforms.
+- **Oracle (C++ canonical since D-030):**
+  - **What the gates check:** pinned C++ goldens and deep goldens, run for
+    both the optimized core and the frozen naive `core/ref`; vectors and trig
+    against pinned values; determinism and never-repeat properties; the
+    440×280 bench in `full`.
+  - **Cross-toolchain:** CI checks the same pins on Linux/GCC.
+  - **Gap:** the oracle now proves "no unintended change", not "matches a spec
+    written independently"; intended changes are DECISIONS entries with
+    re-pinned goldens.
 - **Last human ratification:** 2026-10-01 — spin-up manifest ratified by poll.
 
 ## Invariants under active protection
@@ -146,7 +147,8 @@ hold **and** a `traces/` entry is written.
   disclosed (D-021).
 
 ### Backlog (unprioritized; the human orders these)
-Scanner sound / instrument mode (tempo, scale quantization, MIDI/OSC); branching
+WebAssembly build of libculture for a web viewer that runs the ONE canonical
+core (D-030; the JS prototype is frozen); scanner sound / instrument mode (tempo, scale quantization, MIDI/OSC); branching
 history (tree of world states); recording and export; presets; GPU compute for
 very large worlds; other form factors (plugin, FOUNDATIONS module).
 

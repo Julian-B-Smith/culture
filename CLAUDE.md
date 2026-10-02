@@ -73,9 +73,11 @@ ambient sonification. Form: `libculture` (pure C++20 core) + headless trace CLI
 + one native macOS viewer with sound. Interplay between tiers is the point;
 board-wiping behavior is a defect (D-005). Packet: `docs/handoff/`.
 
-**Stack & entrypoints.** Phase 0: Node >= 18 runs the JS reference
-(`reference/core.js`, normative) and the oracle tools (`tools/golden.js`,
-`tools/compare.js`). Phase 1+: C++20, CMake with `-G "Unix Makefiles"` (CLT
+**Stack & entrypoints.** C++20 `libculture` is the **canonical**
+implementation (D-030): `core/` (optimized) and `core/ref/` (the frozen naive
+core every optimized core must match). The JS prototype (`reference/`) is
+frozen at tag `v0-js-parity`, where it was proven bit-identical. Node >= 18 is
+still needed for `tools/compare.js`. CMake with `-G "Unix Makefiles"` (CLT
 only, no Xcode/Ninja); always pass absolute build paths. Render and audio
 stacks are undecided (ROADMAP P2/P3 gates). Target layout: PORT_PLAN.md.
 `-ffp-contract=off` in CMakeLists.txt is load-bearing: FMA contraction changes
@@ -87,7 +89,9 @@ double rounding and breaks parity.
 - All arithmetic in double; float32 only where SPEC §1 stores float32, rounded
   at store. Integer trace fields match exactly; only record/lastMax get
   compare.js's relative tolerance — never loosen the integer checks.
-- Port the SPEC §8 quirks faithfully; changing one is a Phase-4 DECISIONS entry.
+- The simulation's semantics are SPEC (v0) plus the DECISIONS entries that
+  change it (P4 onward). A semantic change lands in `core/` AND `core/ref/` in
+  the same commit, with regenerated and re-pinned goldens.
 - Audio and UI only read the world (SOUND.md); the sim is deterministic whether
   or not they run. Offline audio renders of a fixed seed are bit-reproducible.
 - Instant search mode always exists (goldens use it); live default is
@@ -97,24 +101,27 @@ double rounding and breaks parity.
   "surprise"; the P5 map is **block predictability gain**, never "causal" or
   "downward causation". "Rules never repeat" is guaranteed; open-endedness is
   only ever measured.
-- Performance work never changes results; the goldens are the guard. Measure
-  in Release only.
+- Performance work never changes results: optimized code must equal
+  `core/ref/` and the pinned deep goldens. Never optimize `core/ref/`.
+  Measure in Release only.
 
-**Protected paths** (human gate + DECISIONS entry + re-pin): `golden/`,
-`reference/core.js`, `tools/golden.js`, `tools/compare.js`,
-`golden/PINS.sha256`, `docs/handoff/` (packet as received), `./verify`.
+**Protected paths** (human gate + DECISIONS entry + re-pin): `golden/`
+(incl. `deep/`, `js-v1/`, `PINS.sha256`), `core/ref/`, `tests/*.expected`,
+`tools/`, the frozen JS set (`reference/`, `tests/js/`), `docs/handoff/`
+(packet as received), `./verify`.
 
-**Verify targets.** `fast` (~35 s warm): kit integrity, leak gate, structure,
-golden sha256 pins, compare.js self-test (planted divergence must FAIL),
-reference regenerates default-seed-1, C++ Release build, JS-vs-C++ unit
-vectors (incl. pow/log2), fdlibm trig hash, C++ default-seed-1 vs golden,
-deep hidden-state parity (default seed 1 + chaos seed 7).
-`full` (~2.5 min): fast + the other three goldens (reference and C++), deep
-parity on all of them + chaos seed 11, 440×280 bench < 4 ms on seeds 1–3.
+**Verify targets.** `fast` (~25 s warm): kit integrity, leak gate, structure,
+sha256 pins (26 oracle files), compare.js self-test (planted divergence must
+FAIL), C++ Release build, vectors and trig vs pinned, default-seed-1 vs
+golden, deep hidden state vs pinned for BOTH cores (default 1, chaos 7),
+properties (determinism, never-repeat). `full`: fast + the other three
+goldens, deep for both cores on all six runs, 440×280 bench < 4 ms on seeds
+1–3. CI runs `fast` on Linux/GCC against pins made with Apple clang, which
+makes it a cross-toolchain gate.
 Trig in the core is `core/src/fdlibm.hpp` (explicit-fma fdlibm, D-027) —
 never `std::cos`/`std::sin`.
 
-**Delegation (rung 2).** Read-only subagents for SPEC/JS cross-checks;
+**Delegation (rung 2).** Read-only subagents for cross-checks and research;
 `verifier` (Haiku) for oracle runs; `critic` (Opus) on anything touching an
 invariant. Every agent's model is pinned in its frontmatter.
 
