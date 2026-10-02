@@ -44,7 +44,7 @@ hold **and** a `traces/` entry is written.
   3. The same `./verify fast` is green in GitHub Actions on the first push/PR. ✅ 2026-10-02, run 36959155390 (Linux, Node v24.21.0)
 - **Out of scope:** any C++.
 
-### P1 — Headless core, bit-exact
+### P1 — Headless core, bit-exact ← current (in review: PR #2)
 - **Status:** done 2026-10-02 (trace: traces/2026-10-02-p1-core.md)
 - **Scope:** `core/` (libculture), `trace/` CLI, unit tests, CMake.
 - **Build order:** RNG+hash → screen+growth → life update+noise → territory →

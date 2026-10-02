@@ -114,6 +114,18 @@ never `std::cos`/`std::sin`.
 `verifier` (Haiku) for oracle runs; `critic` (Opus) on anything touching an
 invariant. Every agent's model is pinned in its frontmatter.
 
+## Mailbox
+
+- **`integrations/` in THIS repo is the only place briefs to Culture land.**
+  If a brief is not here, it is not ours to answer.
+- **Responses to OUR briefs live in the PROVIDER's tree** (e.g.
+  `<provider>/integrations/culture/`), not here. Nothing signals us when one
+  arrives; pull and read them deliberately.
+- **Other repos' exchanges may be READ freely, but never ACTED on** and never
+  raised to the human as ours. If one genuinely concerns Culture, file our own
+  brief.
+<!-- /kit:mailbox:2.1.0 -->
+
 <!-- KNOWLEDGE-LOOP:START -->
 ## Self-Improving Knowledge Loop
 
