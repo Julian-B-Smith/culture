@@ -6,7 +6,7 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 
 ## Status
 
-- **Phase:** P0 — harness (scaffolded 2026-10-01; closes when CI has run green once on GitHub).
+- **Phase:** P1 — headless core, bit-exact (ready to start). P0 closed 2026-10-02 (trace: traces/2026-10-02-p0-close.md).
 - **Oracle:** `fast` = kit gates, structure, golden sha256 pins, compare.js
   self-test with a planted divergence, reference regenerates default-seed-1
   byte-identically. `full` = fast + all four goldens regenerated. **Gap:** no
@@ -32,16 +32,16 @@ hold **and** a `traces/` entry is written.
 - **Shape:** fan-out read-only research subagents (rung 2), lead synthesizes.
 
 ### P0 — Harness
-- **Status:** in-progress
+- **Status:** done (trace: traces/2026-10-02-p0-close.md)
 - **Acceptance:**
   1. The reference runs headless and the goldens regenerate byte-identically:
      `./verify full` green locally. ✅ 2026-10-01
   2. The compare tool runs and demonstrably fires: `compare_selftest` in `fast`. ✅
-  3. The same `./verify fast` is green in GitHub Actions on the first push/PR.
+  3. The same `./verify fast` is green in GitHub Actions on the first push/PR. ✅ 2026-10-02, run 36959155390 (Linux, Node v24.21.0)
 - **Out of scope:** any C++.
 
 ### P1 — Headless core, bit-exact
-- **Status:** blocked on P0
+- **Status:** open (ready)
 - **Scope:** `core/` (libculture), `trace/` CLI, unit tests, CMake.
 - **Build order:** RNG+hash → screen+growth → life update+noise → territory →
   surprise → search+placement → extinction+retreat → crowding+reign →
