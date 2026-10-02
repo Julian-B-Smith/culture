@@ -93,6 +93,10 @@ double rounding and breaks parity.
 - Instant search mode always exists (goldens use it); live default is
   deterministic latency L = 30 (D-021).
 - No stacked lattice layers (D-006) without a new reason from the human.
+- Wording (D-029): the trigger is **surprisal** (Shannon), not Bayesian
+  "surprise"; the P5 map is **block predictability gain**, never "causal" or
+  "downward causation". "Rules never repeat" is guaranteed; open-endedness is
+  only ever measured.
 - Performance work never changes results; the goldens are the guard. Measure
   in Release only.
 
