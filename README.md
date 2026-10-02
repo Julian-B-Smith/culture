@@ -9,7 +9,7 @@ before. It never reuses a rule. Color families react to each other, long reigns
 mutate, crowding slows things down, borders harden, sites remember harm, and an
 ambient sonification makes each ruleset a voice.
 
-*Last verified: 2026-10-02 — `./verify full` green. The C++ core is canonical (D-030). At the hand-over (tag `v0-js-parity`) it was proven bit-identical to the JS prototype, and its goldens now pin every hidden value each generation. 2.0–2.2 ms/step at 440×280.*
+*Last verified: 2026-10-02 — `./verify full` green. The C++ core is canonical (D-030); it was proven bit-identical to the JS prototype at tag `v0-js-parity`, then P4 changed three behaviours (D-031: previous-owner retreat, wrapped surprise windows, serial-keyed spark cooldowns). Goldens pin every hidden value each generation.*
 
 ## Try it
 

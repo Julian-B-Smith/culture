@@ -65,6 +65,17 @@ struct Params {
 Params defaultParams();
 Params stressParams();  // golden "stress" profile: more sparks/mutation, no crowding brake
 
+// Max 5x5 window sum of `score` over sites whose tier is F, on the TORUS
+// (D-031, P4 quirk #5: the reference skipped a 2-cell border and did not
+// wrap). Raster order, strictly greater wins; returns the argmax site or -1,
+// and writes the max to `best` (0 if none). The summation order is part of
+// the bit-exact contract: a wrapped (W+4)x(H+4) grid, a summed-area table
+// built row by row, each window evaluated as A - B - C + D. Both cores call
+// this one function so they cannot disagree on rounding. `integral` is
+// scratch, resized here.
+int surpriseWindowMax(const float* score, const uint16_t* tier, int F, int W, int H,
+                      std::vector<double>& integral, double& best);
+
 struct Tier {
   int idx = 0;
   Rule rule;
@@ -143,11 +154,19 @@ class World {
   std::vector<uint8_t> harm;
   std::vector<float> resist;
   std::vector<int32_t> claimed;
+  // Who held each site before its current owner took it (index + birth
+  // serial, so a reused index is detected). Retreating ground goes back to
+  // that owner while it lives, else to the tier below (D-031, P4 quirk #1).
+  std::vector<uint16_t> prevTier;
+  std::vector<uint64_t> prevSerial;
   std::vector<float> score;
   std::vector<double> integral;
 
   std::vector<Tier> tiers, extinct;
-  std::unordered_map<int32_t, int32_t> sparkLast;  // pair key -> generation
+  // Spark cooldowns, keyed by the two tiers' birth SERIALS (D-031, P4
+  // quirk #8): indices are reused after extinction, so an index key let a
+  // newborn tier inherit a dead tier's cooldown.
+  std::unordered_map<uint64_t, int32_t> sparkLast;
   std::unordered_set<uint32_t> usedRules;  // Rule::key(); no rule is ever used twice
 
   int32_t gen = 0, lastBirth = 0, reignStart = 0;

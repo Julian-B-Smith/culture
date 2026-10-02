@@ -1,0 +1,26 @@
+# p4-decisions — the SPEC §8 quirks and the screen review, decided
+
+- **Queue item:** ROADMAP P4 (decide the quirks), with the screen review from D-029.
+- **Why:** Each quirk and screen proposal was a human keep/change call; the human decided by poll with measured evidence in hand (D-031). Prerequisite: C++ canonical (D-030, PR #7).
+- **Evidence consulted:** `culture_quirks` over 400k gens before the changes and again after; SPEC §8; D-009, D-021, D-029.
+- **What changed:**
+  - **Both cores:** previous-owner retreat (#1), wrapped surprise windows via the shared `surpriseWindowMax` (#5), serial-keyed spark cooldowns (#8), dead-code comment (#7).
+  - **Goldens and deep goldens:** regenerated, 26 pins renewed. Vectors and trig unchanged, as expected: screen, growth and RNG are untouched.
+  - **Tests:** a window-wrap unit test.
+  - **`analysis/quirks.cpp`:** edge-birth and retreat-target metrics.
+  - **Docs:** D-031, ROADMAP.
+- **Before / after** (stress, 8 × 10,000 gens):
+  - births 184 → 177; extinctions 23 → 31;
+  - births centred in the old edge band 0 → 11;
+  - retreating cells returned to a previous owner other than idx−1: 0 → 32,106 (25.7%).
+  - Default profile (16 × 20,000 gens):
+    - births 474 → 515 (sparks 55 → 80);
+    - extinctions 79 → 111;
+    - mean lifespan of tiers that went extinct 508 → 723 gens;
+    - edge-band births 0 → 23 (4.5%, matching the band's 4.6% share of sites);
+    - retreating cells returned to a previous owner 0 → 151,571 of 194,890 (78%);
+    - failed searches 3 → 15.
+  - The world's character shifts: more turnover and longer-lived tiers. Whether that is better is the human's call by eye (it serves "interplay is the point", D-005), not something the numbers settle.
+- **Alternatives rejected:** see D-031 (lineage-parent retreat, keeping the border band, fixing #8 only in adapters, explicit B2/complement rules).
+- **Verify:** `./verify full` exit 0 before commit. The optimized and naive cores agree on all six deep runs under the new semantics. Plants: the old border loop → window-wrap test red (site sum 9, not 25).
+- **Open questions:** the next phase is the human's pick (P2 / P5 / PE1). Both cores share `surpriseWindowMax` by design (summation order is contract), so that one function is not independently cross-checked.
