@@ -6,7 +6,7 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 
 ## Status
 
-- **Phase:** PA0 — prior-art landscape (current, chosen 2026-10-02). P1 closed and merged 2026-10-02 (trace: traces/2026-10-02-p1-core.md). P4 (quirks) is also ready; P2 waits on the render-stack decision.
+- **Phase:** P4 — decide the quirks (current, chosen 2026-10-02). Done: P0, P1, PA0 (all 2026-10-02). P2 waits on the render-stack decision; PE1 is ready and independent.
 - **Oracle:** `fast` = kit gates, structure, golden sha256 pins, compare.js
   self-test with a planted divergence, reference regenerates default-seed-1
   byte-identically, C++ build + JS-vs-C++ vectors + fdlibm trig + C++
@@ -27,8 +27,8 @@ store-rounding, SPEC §8 quirks (port faithfully, decide in P4).
 Each phase closes when `./verify full` is green **and** its acceptance criteria
 hold **and** a `traces/` entry is written.
 
-### PA0 — Prior-art landscape (Decision 30 bookend) ← current
-- **Status:** in progress (must close before P5 design is committed)
+### PA0 — Prior-art landscape (Decision 30 bookend)
+- **Status:** done 2026-10-02, judged complete by the human (trace: traces/2026-10-02-pa0-prior-art.md; result: docs/prior-art.md; adoptions: D-029)
 - **Acceptance:** `docs/prior-art.md`, dated and cited, covering: Life-like rule
   spaces and rule-changing CAs, open-ended evolution in CA (Lenia, Flow-Lenia,
   Evoloops), causal emergence / effective information (Hoel) and coarse-graining
@@ -87,19 +87,57 @@ hold **and** a `traces/` entry is written.
   dropouts; offline render of a fixed seed is bit-reproducible; **human signs
   off by ear** on register spread and riser level.
 
-### P4 — Decide the quirks
-- **Status:** open (ready; each quirk is a human call)
-- **Acceptance:** each SPEC §8 quirk kept (documented) or changed (new DECISIONS
+### P4 — Decide the quirks ← current
+- **Status:** in progress (each item is a human call)
+- **Agenda:**
+  1. The ten SPEC §8 quirks.
+  2. The rule-screen review (D-029, docs/prior-art.md recommendation 2):
+     - exclude B2 rules alongside B1?
+     - treat a rule's on/off complement as already used?
+     - add Eppstein's growth/decay pre-screen?
+     - calibrate the acceptance window against Yin 2026's census of all
+       262,144 rules.
+     Reia & Kinouchi's "border of extinction" reading of Life is input here.
+  Decide both together: any change regenerates the goldens, and one
+  regeneration beats two.
+- **Acceptance:** each agenda item kept (documented) or changed (new DECISIONS
   entry, goldens regenerated and re-pinned). DECISIONS records which
   implementation (JS or C++) is canonical from then on.
 
 ### P5 — Synthesis: recursive coarse-graining (chosen priority, D-021)
-- **Status:** blocked on P4 and PA0
-- **Acceptance (first slice):** block-level (e.g. 8×8) autonomy measure
-  (effective information / causal emergence) computed deterministically and
-  shown as a heatmap; a recorded finding on whether autonomy lights up where
-  tiers form. Autonomy-triggered emergence and learned layer rules are later
-  slices, specified at the P5 gate.
+- **Status:** blocked on P4 (PA0 done)
+- **Design basis (D-029, docs/prior-art.md §3):** Rosas, Mediano et al. 2020 Ψ,
+  per 8×8 block, over a quantized block feature (start with live-cell count in
+  8–16 bins), from plug-in counts. Deterministic, counts and logs only. Read Sas
+  et al. 2025 (bias-corrected estimators) before implementing.
+- **Acceptance (first slice):**
+  1. Ψ per block computed in a pure, deterministic module, reproducible from the
+     seed. Shown as a heatmap and called "block predictability gain", never
+     "causal" (D-029 wording rule).
+  2. A seeded shuffle null baseline per block. Only blocks above the null count.
+     This guards against the upward bias of sparse plug-in estimates.
+  3. Offline validation against an independent structure detector (Rupe &
+     Crutchfield local causal states, or Lizier local transfer entropy), with a
+     recorded finding on whether high-Ψ blocks coincide with forming tiers.
+     Until that finding exists, the measure triggers nothing.
+- **Later slices, specified at their gates:** autonomy-triggered emergence. The
+  new layer's rule is a modal lookup table (block state → most frequent next
+  state) built from the counts already held, admitted only when Israeli &
+  Goldenfeld's closure test passes.
+
+### PE1 — Measure open-endedness (Layer-E)
+- **Status:** open (ready; independent of P2–P5)
+- **Why (D-029):** "rules never repeat" is guaranteed by construction; whether
+  the world is open-ended is a measured hallmark (Taylor et al. 2016). Never
+  conflate the two.
+- **Acceptance:**
+  1. Bedau–Packard evolutionary activity statistics over the tier lineage
+     (components = tiers; activity = persistence-weighted territory): new and
+     cumulative activity, diversity, mean activity.
+  2. A deterministic offline tool runs them for a fixed seed set.
+  3. A report characterizes runs as accumulating vs merely churning.
+  Measured, never a `./verify` gate (Layer-E). MODES metrics are the next step
+  if activity alone is inconclusive.
 
 ### PA1 — Pre-ship prior-art & IP re-scan (Decision 30 bookend)
 - **Status:** blocked (before any public release or binary distribution)
