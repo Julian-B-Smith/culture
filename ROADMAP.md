@@ -78,7 +78,7 @@ hold **and** a `traces/` entry is written.
     16× (508 of 960 gens/s at 220×140 under load).
   - Rare stalls of 120–725 ms remain, part search and part OS scheduling.
   - Search worker with deterministic latency: **done (D-034)**. L = 30 still
-    stalls at 16× (30 gens = 31 ms there); the choice of L is open.
+    stalls at 16× (30 gens = 31 ms there); L kept at 30 by the human (D-035).
   - Remaining: a multithreaded step that core/ref must still match bit for bit.
 - **Blocking open question (ask the human at the gate):** rendering/windowing
   stack (SDL3, sokol, JUCE, raylib, …) — decide after a small spike (D-021).

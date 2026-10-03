@@ -189,3 +189,6 @@ Adapters may compute `resolve` on a worker thread launched when `latencyJob()` a
 
 All hold 60 fps at target speed.
 **Open (human):** L counts generations, so its wall-clock headroom shrinks with speed. At 16× (960 gens/s) 30 gens is 31 ms and searches can still stall (154 ms max at 220×140). A larger L fixes this but changes which world a seed produces in live play. A speed-dependent L would make speed change the world, which is rejected as a principle.
+
+**D-035: Search latency stays at L = 30 (2026-10-03, human decision by poll).**
+Resolves the question D-034 left open. L is counted in generations: it gives 500 ms of slack at 1× but only 31 ms at 16×, where long searches can still stall the viewer (154 ms measured). Kept at 30: births stay close to the surprise that caused them, and the stalls only affect 8–16×. Rejected: L = 120 (changes which world a seed produces in live play); L as a viewer option (deferred, though the core already takes L as a parameter).

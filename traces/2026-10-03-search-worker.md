@@ -24,4 +24,4 @@
 
   At 220×140 16×: 154 ms for the worker vs 158 ms for instant.
 - **Alternatives rejected:** threads inside core/ (violates core purity); a speed-dependent L (speed would change the world); `std::async` futures dropped on cancel (their destructor blocks, so they are parked instead).
-- **Open questions:** the choice of L at high speed (D-034). `./verify fast` now takes ~55 s (latency properties add ~30 s).
+- **Open questions:** `./verify fast` now takes ~55 s (latency properties add ~30 s). The choice of L was resolved by poll before merge: keep 30 (D-035).
