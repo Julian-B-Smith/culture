@@ -181,7 +181,9 @@ deep_check() {
   return $ok
 }
 
-# Determinism and never-repeat (tests/properties.cpp).
+# Determinism, never-repeat, window wrap, and deterministic-latency search:
+# L = 0 equals instant mode, and a worker-thread run equals a synchronous
+# one (tests/properties.cpp; D-034).
 cpp_props() {
   local out
   if out="$("$PWD/build/culture_properties")"; then
@@ -219,8 +221,8 @@ fast() {
     cpp_vectors || ok=1
     cpp_trig || ok=1
     cpp_parity "default 1" || ok=1
-    deep_check opt "default 1 3000" "chaos 7 4000" || ok=1
-    deep_check ref "default 1 3000" "chaos 7 4000" || ok=1
+    deep_check opt "default 1 3000" "chaos 7 4000" "chaos-latency 7 4000" || ok=1
+    deep_check ref "default 1 3000" "chaos 7 4000" "chaos-latency 7 4000" || ok=1
     cpp_props || ok=1
   else
     ok=1
@@ -233,8 +235,8 @@ full() {
   # ---- Layer-E: the whole gate. Run before closing a queue item. -----------
   local ok=0
   cpp_parity "default 2" "default 3" "stress 4" || ok=1
-  deep_check opt "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" || ok=1
-  deep_check ref "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" || ok=1
+  deep_check opt "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" "latency 1 3000" || ok=1
+  deep_check ref "default 2 3000" "default 3 3000" "stress 4 5000" "chaos 11 4000" "latency 1 3000" || ok=1
   cpp_bench || ok=1
   return $ok
 }

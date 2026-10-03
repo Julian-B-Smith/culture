@@ -147,6 +147,47 @@ int surpriseWindowMax(const float* score, const uint16_t* tier, int F, int W, in
   return arg;
 }
 
+bool searchCandidates(Search& S, const Rule* parentRule, const std::unordered_set<uint32_t>& used,
+                      double maxSpeed, int maxCandidates, Rule& rule, double& speedFound) {
+  // The reference's work() loop, verbatim in RNG order (SPEC §2): candidate
+  // draws, growth(), screen() all consume S.rng.
+  Rng& r = S.rng;
+  int done = 0;
+  while (S.tries < 800 && done++ < maxCandidates) {
+    S.tries++;
+    uint16_t born = 0, survive = 0;
+    if (parentRule) {
+      // A mutant differs from its parent's rule by one or two neighbor counts.
+      born = parentRule->born; survive = parentRule->survive;
+      const int flips = r() < 0.6 ? 1 : 2;
+      for (int f = 0; f < flips; f++) {
+        const int bit = int(std::floor(r() * 16));
+        if (bit < 7) born ^= uint16_t(1 << (bit + 2)); else survive ^= uint16_t(1 << (bit - 7));
+      }
+    } else {
+      for (int c = 2; c <= 8; c++) if (r() < 0.28) born |= uint16_t(1 << c);
+      for (int c = 0; c <= 8; c++) if (r() < 0.4) survive |= uint16_t(1 << c);
+    }
+    if (!born) continue;
+    const Rule cand{born, survive};
+    if (used.count(cand.key())) continue;
+    const double speed = growth(cand, r, maxSpeed);
+    if (speed > maxSpeed) continue;
+    const ScreenResult st = screen(cand, r);
+    if (st.ok) { rule = cand; speedFound = speed; return true; }
+  }
+  return false;
+}
+
+SearchOutcome runSearch(const SearchJob& job) {
+  SearchOutcome o;
+  o.id = job.id;
+  o.after = job.search;
+  o.found = searchCandidates(o.after, job.hasParentRule ? &job.parentRule : nullptr, job.used, job.maxSpeed,
+                             World::kUnlimited, o.rule, o.speed);
+  return o;
+}
+
 namespace {
 void genome(Rng& rng, uint8_t el, Tier& t) {
   t.el = el;
@@ -488,7 +529,7 @@ Event World::emerge(int site, double surprise, const Params&, const int* parents
   }
   const uint32_t h = hash32(bits);
   Search s{cx, cy, surprise, h, Rng(h), 0, frontier(), parents != nullptr,
-           {parents ? parents[0] : 0, parents ? parents[1] : 0}, mutateFrom};
+           {parents ? parents[0] : 0, parents ? parents[1] : 0}, mutateFrom, gen};
   search = s;
   return Event{Event::Searching, 0, cx, cy, gen, parents != nullptr};
 }
@@ -497,36 +538,10 @@ std::optional<Event> World::work(const Params& p, int maxCandidates) {
   if (!search) return std::nullopt;
   if (search->parent != frontier() || retreat) { search.reset(); return std::nullopt; }
   Search& S = *search;
-  Rng& r = S.rng;
-  bool found = false;
   Rule rule;
-  double speedFound = 0;
-  int done = 0;
-  while (!found && S.tries < 800 && done++ < maxCandidates) {
-    S.tries++;
-    uint16_t born = 0, survive = 0;
-    if (S.mutateFrom >= 0) {
-      // A mutant differs from its parent's rule by one or two neighbor counts.
-      const Rule pr0 = tiers[S.mutateFrom].rule;
-      born = pr0.born; survive = pr0.survive;
-      const int flips = r() < 0.6 ? 1 : 2;
-      for (int f = 0; f < flips; f++) {
-        const int bit = int(std::floor(r() * 16));
-        if (bit < 7) born ^= uint16_t(1 << (bit + 2)); else survive ^= uint16_t(1 << (bit - 7));
-      }
-    } else {
-      for (int c = 2; c <= 8; c++) if (r() < 0.28) born |= uint16_t(1 << c);
-      for (int c = 0; c <= 8; c++) if (r() < 0.4) survive |= uint16_t(1 << c);
-    }
-    if (!born) continue;
-    const Rule cand{born, survive};
-    if (usedRules.count(cand.key())) continue;
-    const double speed = growth(cand, r, p.maxSpeed);
-    if (speed > p.maxSpeed) continue;
-    const ScreenResult st = screen(cand, r);
-    if (st.ok) { found = true; rule = cand; speedFound = speed; }
-  }
-  if (!found) {
+  double speed = 0;
+  const Rule* parentRule = S.mutateFrom >= 0 ? &tiers[S.mutateFrom].rule : nullptr;
+  if (!searchCandidates(S, parentRule, usedRules, p.maxSpeed, maxCandidates, rule, speed)) {
     if (S.tries >= 800) {
       // No viable rule: count a failed mutant as a birth for pacing (quirk 4: record *= 1.05).
       if (S.mutateFrom >= 0) lastBirth = gen;
@@ -535,7 +550,41 @@ std::optional<Event> World::work(const Params& p, int maxCandidates) {
     }
     return std::nullopt;
   }
-  Search s = S;  // copy (RNG state included): `search` is cleared before placement, as in the JS
+  return place(rule, speed);
+}
+
+std::optional<Event> World::workLatency(const Params& p, int L, const Resolver& resolve) {
+  if (!search) { job_.reset(); return std::nullopt; }
+  // Cancellation is checked every generation, as work() does in sliced mode.
+  if (search->parent != frontier() || retreat) { search.reset(); job_.reset(); return std::nullopt; }
+  if (!job_) {
+    // Snapshot everything the search reads (see SearchJob): equivalent to the
+    // live World because nothing can add a rule or change the parent's rule
+    // while this search is pending.
+    SearchJob j;
+    j.id = nextJobId_++;
+    j.search = *search;
+    j.hasParentRule = search->mutateFrom >= 0;
+    if (j.hasParentRule) j.parentRule = tiers[search->mutateFrom].rule;
+    j.used = usedRules;
+    j.maxSpeed = p.maxSpeed;
+    job_ = std::move(j);
+  }
+  if (gen < search->startGen + L) return std::nullopt;
+  const SearchOutcome o = resolve(*job_);
+  job_.reset();
+  *search = o.after;  // rng and tries as the loop left them
+  if (!o.found) {
+    if (search->mutateFrom >= 0) lastBirth = gen;  // quirk 4, as in work()
+    search.reset();
+    record *= 1.05;
+    return std::nullopt;
+  }
+  return place(o.rule, o.speed);
+}
+
+Event World::place(const Rule& rule, double speedFound) {
+  Search s = *search;  // copy (RNG state included): `search` is cleared before placement, as in the JS
   search.reset();
   Rng& rr = s.rng;
   usedRules.insert(rule.key());

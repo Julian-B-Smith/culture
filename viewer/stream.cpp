@@ -7,6 +7,12 @@
 // --spf  speed: generations per frame at 60 fps (the prototype's meaning);
 //        the target rate is spf * 60 gens/s whatever --fps is. Default 1.
 // --fps  frames per second written; default 60
+// --latency L: deterministic-latency search (D-034), the default with L = 30:
+//        each rule search runs on a worker thread from the generation it
+//        starts and lands at exactly start + L, so a slow search never stalls
+//        the picture unless it is still running L generations later. The
+//        world is identical to a synchronous run (tests/properties.cpp).
+//        --latency -1 selects the older modes below.
 // --slice K: work(p, K) once per generation (sliced search, smooth); 0 =
 //        instant search, as the goldens use (a birth can stall a frame).
 //        Default 2: each candidate is a 280-gen test run (1-2 ms), and the
@@ -41,6 +47,8 @@
 //               u16 x, u16 y, u32 gen }
 //   W*H bytes: (min(tier, 127) << 1) | alive
 #include <chrono>
+#include <future>
+#include <map>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -68,7 +76,7 @@ int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 }  // namespace
 
 int main(int argc, char** argv) {
-  int W = 220, H = 140, spf = 1, fps = 60, slice = 2;
+  int W = 220, H = 140, spf = 1, fps = 60, slice = 2, latency = 30;
   uint32_t seed = 1;
   std::string profile = "default";
   for (int i = 1; i + 1 < argc; i += 2) {
@@ -79,12 +87,39 @@ int main(int argc, char** argv) {
     else if (a == "--spf") spf = std::atoi(v.c_str());
     else if (a == "--fps") fps = std::atoi(v.c_str());
     else if (a == "--slice") slice = std::atoi(v.c_str());
+    else if (a == "--latency") latency = std::atoi(v.c_str());
   }
   W = clampi(W, 6, 1200); H = clampi(H, 6, 800);
   spf = clampi(spf, 1, 64); fps = clampi(fps, 1, 60); slice = clampi(slice, 0, 800);
+  latency = clampi(latency, -1, 600);
   const Params p = profile == "stress" ? stressParams() : defaultParams();
   World w(W, H, seed);
   const int budget = slice == 0 ? World::kUnlimited : slice;
+
+  // Worker searches, keyed by job id. A std::async future blocks in its
+  // destructor until the task finishes, so a cancelled search is parked in
+  // `orphans` and dropped only once done, never destroyed while running
+  // (that would stall this loop for the rest of the search).
+  std::map<uint64_t, std::shared_future<SearchOutcome>> running;
+  std::vector<std::shared_future<SearchOutcome>> orphans;
+  const World::Resolver resolve = [&](const SearchJob& j) {
+    auto it = running.find(j.id);
+    if (it == running.end()) return runSearch(j);  // not launched (cannot happen in this loop): still exact
+    SearchOutcome out = it->second.get();          // blocks only if not done L generations later
+    running.erase(it);
+    return out;
+  };
+  auto advance = [&](std::vector<Event>& events) {
+    if (auto e = w.step(p)) events.push_back(*e);
+    if (latency >= 0) {
+      if (auto e = w.workLatency(p, latency, resolve)) events.push_back(*e);
+      const SearchJob* j = w.latencyJob();
+      // Park futures whose job was cancelled; launch the new job, if any.
+      for (auto it = running.begin(); it != running.end();)
+        if (!j || it->first != j->id) { orphans.push_back(it->second); it = running.erase(it); } else ++it;
+      if (j && !running.count(j->id)) running[j->id] = std::async(std::launch::async, runSearch, *j).share();
+    } else if (auto e = w.work(p, budget)) events.push_back(*e);
+  };
 
   std::vector<Event> events;
   Out o;
@@ -99,8 +134,7 @@ int main(int argc, char** argv) {
     owed += gensPerFrame;
     const auto frameStart = clock::now();
     while (owed >= 1) {
-      if (auto e = w.step(p)) events.push_back(*e);
-      if (auto e = w.work(p, budget)) events.push_back(*e);
+      advance(events);
       owed -= 1;
       if (clock::now() - frameStart > stepBudget) { owed = std::min(owed, 1.0); break; }  // drop the deficit
     }
@@ -137,6 +171,9 @@ int main(int argc, char** argv) {
     // A closed pipe (the browser went away) ends the process.
     if (std::fwrite(&len, 4, 1, stdout) != 1 || std::fwrite(o.b.data(), 1, o.b.size(), stdout) != o.b.size()) return 0;
     if (std::fflush(stdout) != 0) return 0;
+    std::erase_if(orphans, [](const std::shared_future<SearchOutcome>& f) {
+      return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    });
     next += period;
     const auto now = clock::now();
     if (next < now) next = now;  // a slow step (instant search) drops pace, never bursts

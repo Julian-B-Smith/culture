@@ -2,7 +2,8 @@
 //
 //   culture_trace [--profile default|stress] [--out dir] [--gens N] seed...
 //   culture_trace --bench WxH [--gens N] [--seed S]
-//   culture_trace --deep [--core opt|ref] [--profile default|stress|chaos] [--mask-trig] --gens N seed   (stdout)
+//   culture_trace --deep [--core opt|ref] [--profile default|stress|chaos|latency|chaos-latency]
+//                 [--mask-trig] --gens N seed   (stdout)
 //
 // Trace mode writes <out>/<profile>-seed-<n>.jsonl in the golden format (a
 // header, one line per generation, a births footer) using INSTANT search:
@@ -134,15 +135,18 @@ int runTrace(const std::string& profile, const std::string& outDir, int gens, ui
 // file for what each one covers). Arrays are hashed as their in-memory
 // little-endian bytes, matching the JS typed arrays. maskTrig prints "-" for
 // the trig-derived stats, used when the local node is the plain fdlibm flavor.
-struct DeepProfile { Params p; int W, H, slice, force; };
+// latency >= 0 runs deterministic-latency search (D-034) with that L, using
+// the synchronous resolver; properties prove a worker thread gives the same.
+struct DeepProfile { Params p; int W, H, slice, force, latency = -1; };
 
 DeepProfile deepProfile(const std::string& name) {
   if (name == "stress") return {stressParams(), 220, 140, World::kUnlimited, 0};
-  if (name == "chaos") {
+  if (name == "chaos" || name == "chaos-latency") {
     Params p = defaultParams();
-    p.spark = 0.002; p.mutation = 5; p.extinction = 30;  // same literals as tests/deep.js
-    return {p, 37, 23, 2, 15};
+    p.spark = 0.002; p.mutation = 5; p.extinction = 30;  // same literals as tests/js/deep.js
+    return {p, 37, 23, 2, 15, name == "chaos-latency" ? 30 : -1};
   }
+  if (name == "latency") return {defaultParams(), 220, 140, World::kUnlimited, 0, 30};
   return {defaultParams(), 220, 140, World::kUnlimited, 0};
 }
 
@@ -161,7 +165,8 @@ int runDeep(const std::string& profile, int gens, uint32_t seed, bool maskTrig) 
   auto bits = [](double x) { uint64_t u; std::memcpy(&u, &x, 8); return (unsigned long long)u; };
   for (int g = 0; g < gens; g++) {
     w.step(P.p);
-    w.work(P.p, P.slice);
+    if (P.latency >= 0) w.workLatency(P.p, P.latency, runSearch);
+    else w.work(P.p, P.slice);
     if (P.force && w.gen % P.force == 0) w.forceEmerge(P.p);
     const Stats& s = w.stats;
     uint32_t sInt = 2166136261u;
@@ -240,7 +245,9 @@ int main(int argc, char** argv) {
     return runBench(W, H, gens > 0 ? gens : 500, benchSeed);
   }
   if (deep) {
-    if (profile != "default" && profile != "stress" && profile != "chaos") { std::fprintf(stderr, "unknown profile %s\n", profile.c_str()); return 2; }
+    if (profile != "default" && profile != "stress" && profile != "chaos" && profile != "latency" && profile != "chaos-latency") {
+      std::fprintf(stderr, "unknown profile %s\n", profile.c_str()); return 2;
+    }
     if (seeds.size() != 1 || gens <= 0) { std::fprintf(stderr, "--deep needs --gens N and one seed\n"); return 2; }
     return refCore ? runDeep<ref::World>(profile, gens, seeds[0], maskTrig) : runDeep<World>(profile, gens, seeds[0], maskTrig);
   }

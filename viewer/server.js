@@ -27,9 +27,11 @@ function streamArgs(q) {
   const sizes = ['165x105', '220x140', '330x210', '440x280', '550x350'];
   const size = sizes.includes(q.get('size')) ? q.get('size') : '220x140';
   const profile = q.get('profile') === 'stress' ? 'stress' : 'default';
+  // search: worker (deterministic latency, default) | sliced | instant.
+  const search = ['worker', 'sliced', 'instant'].includes(q.get('search')) ? q.get('search') : 'worker';
   return ['--size', size, '--seed', String(int('seed', 0, 4294967295, 1)), '--profile', profile,
     '--spf', String(int('spf', 1, 64, 1)), '--fps', String(int('fps', 1, 60, 60)),
-    '--slice', String(int('slice', 0, 800, 2))];
+    '--latency', search === 'worker' ? '30' : '-1', '--slice', search === 'instant' ? '0' : '2'];
 }
 
 // Live streams by id, so /control can pause one. Pausing must stop the

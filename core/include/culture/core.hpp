@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <string>
@@ -130,7 +131,41 @@ struct Search {
   bool hasParents;
   int parents[2];
   int mutateFrom;  // -1 = none
+  int32_t startGen = 0;  // generation the search was triggered (deterministic latency, D-034)
 };
+
+// ---- Rule search, separable from the World (D-034) ----
+// The candidate loop is a pure function of the search state, the rules
+// already used, and (for a mutant) the parent's rule. While a search is
+// pending nothing else can add a rule and the parent's rule cannot change,
+// so a snapshot taken when the search starts is exactly equivalent to
+// reading the live World. That is what lets an adapter run it on a worker
+// thread while the core stays single-threaded and clock-free.
+
+// Runs candidates until one passes, the 800-try budget is spent, or
+// maxCandidates have been tried. Advances s.rng and s.tries exactly as the
+// reference's work() loop. Returns true and fills rule/speed on success.
+bool searchCandidates(Search& s, const Rule* parentRule, const std::unordered_set<uint32_t>& used,
+                      double maxSpeed, int maxCandidates, Rule& rule, double& speed);
+
+// Everything a search needs, copied out of the World when it starts.
+struct SearchJob {
+  uint64_t id = 0;
+  Search search;
+  bool hasParentRule = false;
+  Rule parentRule;
+  std::unordered_set<uint32_t> used;
+  double maxSpeed = 0;
+};
+struct SearchOutcome {
+  uint64_t id = 0;
+  bool found = false;  // false = the 800-try budget ran out
+  Rule rule;
+  double speed = 0;
+  Search after;        // search state after the loop (rng, tries)
+};
+// Pure and thread-safe: reads only the job. Runs to completion.
+SearchOutcome runSearch(const SearchJob& job);
 
 // Per-tier statistics the sound engine listens to (read-only consumers).
 struct Stats {
@@ -148,6 +183,21 @@ class World {
   // Instant mode (goldens) = work(p, kUnlimited) after every step.
   static constexpr int kUnlimited = std::numeric_limits<int>::max();
   std::optional<Event> work(const Params& p, int maxCandidates);
+  // Deterministic-latency search (D-034), the live-play mode: call once per
+  // generation after step(), INSTEAD of work(). A search triggered at
+  // generation g lands at exactly g + L, so the world is a pure function of
+  // (seed, params, L) however long the search takes. `resolve` must return
+  // runSearch(job) for the job it is given; an adapter may compute it ahead
+  // of time on a worker thread (see latencyJob) and block here only if it is
+  // not ready. Cancellation (frontier changed, retreat began) is checked every
+  // generation, exactly as work() does; a failed search applies its
+  // consequences at the landing generation. With L = 0 this reproduces
+  // instant mode (work(p, kUnlimited)) bit for bit.
+  using Resolver = std::function<SearchOutcome(const SearchJob&)>;
+  std::optional<Event> workLatency(const Params& p, int L, const Resolver& resolve);
+  // The pending job in latency mode (set by workLatency on the generation the
+  // search starts), so an adapter can launch it early. Null when none.
+  const SearchJob* latencyJob() const { return job_ ? &*job_ : nullptr; }
   std::optional<Event> forceEmerge(const Params& p);
 
   int frontier() const { return int(tiers.size()) - 1; }
@@ -198,6 +248,9 @@ class World {
  private:
   void resetFrontierStats();
   Event emerge(int site, double surprise, const Params& p, const int* parents, int mutateFrom);
+  Event place(const Rule& rule, double speed);  // finish a successful search (shared by both modes)
+  std::optional<SearchJob> job_;
+  uint64_t nextJobId_ = 1;
   uint64_t nextSerial_ = 0;
   std::vector<double> cosX_, sinX_, cosY_, sinY_;
   std::vector<int> colM_, colP_, rowM_, rowP_;  // torus wrap tables
