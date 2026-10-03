@@ -27,6 +27,14 @@ cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release && cmake --bu
 Then `build/culture_trace --out /tmp 1` writes a golden-format trace, and
 `build/culture_trace --bench 440x280 --gens 4000` times the step.
 
+**Watch the canonical core run** (dev visualizer, [viewer/README.md](viewer/README.md)):
+
+```bash
+cmake --build build --target culture_stream && node viewer/server.js
+```
+
+then open http://localhost:5180.
+
 ## Status
 
 | Part | State |
@@ -51,7 +59,7 @@ Current phase and acceptance criteria: [ROADMAP.md](ROADMAP.md).
 | `tools/` | `compare.js` (check a trace against a golden); `golden.js` (frozen JS generator) |
 | `trace/` | `culture_trace`: trace writer, `--bench`, `--deep [--core ref]` |
 | `tests/` | pinned vectors and trig, property tests; `js/` holds the frozen hand-over tools |
-| `analysis/` | `culture_quirks`: P4 evidence (how often each quirk fires) |
+| `viewer/` | dev visualizer: `culture_stream` + `server.js` + a canvas page (not the P2 viewer) |
 | `docs/handoff/` | the packet as received: BRIEF, SPEC, SOUND, PORT_PLAN |
 | `DECISIONS.md` | append-only design log, D-001 onward |
 | `ROADMAP.md` | phases and gates; outranks every other doc |
