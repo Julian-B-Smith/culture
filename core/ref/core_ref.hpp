@@ -27,6 +27,9 @@ class World {
   // Instant mode (goldens) = work(p, kUnlimited) after every step.
   static constexpr int kUnlimited = std::numeric_limits<int>::max();
   std::optional<Event> work(const Params& p, int maxCandidates);
+  using Resolver = culture::World::Resolver;
+  std::optional<Event> workLatency(const Params& p, int L, const Resolver& resolve);
+  const SearchJob* latencyJob() const { return job_ ? &*job_ : nullptr; }
   std::optional<Event> forceEmerge(const Params& p);
 
   int frontier() const { return int(tiers.size()) - 1; }
@@ -71,6 +74,9 @@ class World {
  private:
   void resetFrontierStats();
   Event emerge(int site, double surprise, const Params& p, const int* parents, int mutateFrom);
+  Event place(const Rule& rule, double speed);
+  std::optional<SearchJob> job_;
+  uint64_t nextJobId_ = 1;
   uint64_t nextSerial_ = 0;
   std::vector<double> cosX_, sinX_, cosY_, sinY_;
   std::vector<int> colM_, colP_, rowM_, rowP_;  // torus wrap tables

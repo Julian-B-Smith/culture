@@ -39,7 +39,10 @@ target_include_directories(culture_vectors PRIVATE core/src)
 target_compile_options(culture_vectors PRIVATE -ffp-contract=off -fno-fast-math)
 
 add_executable(culture_properties tests/properties.cpp)
-target_link_libraries(culture_properties PRIVATE culture)
+# The latency property runs searches on real worker threads (the core never
+# does; only tests and adapters may). Linux needs -pthread for std::async.
+find_package(Threads REQUIRED)
+target_link_libraries(culture_properties PRIVATE culture Threads::Threads)
 
 # P4 evidence: how often each SPEC §8 quirk fires, and how screened rules
 # behave. Observes the World read-only; not part of ./verify.
@@ -49,4 +52,4 @@ target_link_libraries(culture_quirks PRIVATE culture)
 # Dev viewer (viewer/README.md): streams frames of the canonical core to
 # viewer/server.js. An adapter, so it may read the clock to pace frames.
 add_executable(culture_stream viewer/stream.cpp)
-target_link_libraries(culture_stream PRIVATE culture)
+target_link_libraries(culture_stream PRIVATE culture Threads::Threads)  # search worker (D-034)

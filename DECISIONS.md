@@ -169,3 +169,23 @@ Residual risk, recorded rather than hidden: the surprisal score still uses `std:
 **D-033: Interim viewer sound; P3 is next, stack chosen by ear (2026-10-03, human decision by poll).**
 The human noticed the viewer was silent. Sound had not been ported (P3 was parked on the audio-stack decision deferred at spin-up). Chosen: both. (1) Now: the dev viewer plays the **frozen v0 engine** (`reference/sound.js`, served unmodified) fed by the C++ core. The stream (frame v2) carries the per-tier stats, lineage and scalars the engine reads, and the page keeps one stable object per tier (keyed by birth serial), because the engine keys voices by object identity. This is a listening reference, **not P3**: it uses Web Audio, unseeded noise and impulse, and no bit-reproducible render. (2) Next: P3 proper, with the audio stack (miniaudio / Reverb Station FDN / JUCE) decided after listening. P3 no longer waits on P2: the engine only consumes snapshots, so it can be built and offline-rendered first.
 Checked in the browser pane: audio context running, 5 voices on the stress profile, output RMS 0.046. Voice pitches 65.4 Hz (Conway's C2), mutants at 66.0 and 65.8 Hz, a just step at 79.5 Hz. Pause suspends the audio, Resume restores it.
+
+**D-034: Rule search runs off the simulation thread, with deterministic latency (2026-10-03, human request).**
+The human asked for the search worker carried in ROADMAP P2. The core stays single-threaded and clock-free; it gained a separable search:
+- `searchCandidates`, the reference's candidate loop moved out of `work()` unchanged.
+- `runSearch(SearchJob)`, pure and thread-safe, reading only a snapshot taken when the search starts (the search state, used rules, and a mutant parent's rule). The snapshot equals the live World because no birth can happen and no rule can change while a search is pending.
+- `World::workLatency(p, L, resolve)`: a search triggered at generation g lands at exactly g + L. Cancellation is checked every generation, as in sliced mode, and a failed search applies its consequences at g + L.
+Adapters may compute `resolve` on a worker thread launched when `latencyJob()` appears.
+**Proofs (all in ./verify):** instant and sliced goldens unchanged by the refactor. L = 0 equals instant mode every generation (default, stress, chaos). A worker-thread run equals a synchronous run every generation, and every birth lands at start + 30. New deep goldens (`latency`, `chaos-latency`) agree for the optimized and naive cores. A planted off-by-one landing time turned all three latency gates red while core/ref stayed green.
+**Viewer:** worker mode with L = 30 is the default. In the browser pane the first birth landed at gen 893 = 863 (its instant-mode gen) + 30.
+**Measured on an idle machine:**
+
+| World | Speed | Worst frame gap: worker | Worst frame gap: instant |
+|---|---|---|---|
+| 220×140 | 1× | 32 ms | 54 ms |
+| 220×140 | 4× | 34 ms | 179 ms |
+| 440×280 | 2× | 20 ms | 98 ms |
+| 550×350 | 4× | 27 ms | 111 ms |
+
+All hold 60 fps at target speed.
+**Open (human):** L counts generations, so its wall-clock headroom shrinks with speed. At 16× (960 gens/s) 30 gens is 31 ms and searches can still stall (154 ms max at 220×140). A larger L fixes this but changes which world a seed produces in live play. A speed-dependent L would make speed change the world, which is rejected as a principle.

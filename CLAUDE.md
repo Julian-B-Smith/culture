@@ -95,7 +95,9 @@ double rounding and breaks parity.
 - Audio and UI only read the world (SOUND.md); the sim is deterministic whether
   or not they run. Offline audio renders of a fixed seed are bit-reproducible.
 - Instant search mode always exists (goldens use it); live default is
-  deterministic latency L = 30 (D-021).
+  deterministic latency L = 30 (D-021), implemented as `World::workLatency`
+  with the pure `runSearch` (D-034). Threads belong to adapters, never to
+  `core/`; a worker-thread run must equal the synchronous run.
 - No stacked lattice layers (D-006) without a new reason from the human.
 - Wording (D-029): the trigger is **surprisal** (Shannon), not Bayesian
   "surprise"; the P5 map is **block predictability gain**, never "causal" or

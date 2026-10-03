@@ -34,13 +34,18 @@ entry of `.claude/launch.json`.
   target**, so lag is visible: if the machine cannot keep up, the simulation
   slows down while the picture stays at ~60 fps.
 - **search:**
+  - **worker** (default): each rule search runs on a worker thread and lands
+    exactly 30 generations after it started (D-034). The picture never waits
+    for a search unless it is still running 30 generations later, which can
+    happen at 16× (30 gens = 31 ms).
   - **sliced** runs `work(p, 2)` once per generation: smooth. Each candidate
     is a 280-generation test run of 1–2 ms. The first version ran 8 per
     generation and could spend 250 ms in one frame.
   - **instant** finishes each rule search inside its generation, as the goldens
     do. A birth can stall a frame at large sizes.
-  - Sliced births land a few generations later than instant ones, so the two
-    modes are different (equally deterministic) worlds.
+  - The three modes land births at different generations, so they are
+    different (equally deterministic) worlds. Worker = instant + 30 gens, for
+    every search that is not cancelled.
 - **view:** *life* shows live cells bright on their tier's dark ground;
   *territory* shows ownership only.
 - **Full screen** (button or `F`; `F` or `Esc` exits): the world alone, as

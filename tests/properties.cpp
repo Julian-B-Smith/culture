@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <algorithm>
 #include <cstring>
+#include <future>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -83,11 +85,78 @@ bool windowWraps() {
   return true;
 }
 
+// D-034: deterministic-latency search. With L = 0 it must reproduce instant
+// mode exactly (so the instant goldens also vouch for the latency path).
+bool latencyZeroIsInstant() {
+  struct Case { Params p; int W, H; uint32_t seed; int force; };
+  Params chaos = defaultParams(); chaos.spark = 0.002; chaos.mutation = 5; chaos.extinction = 30;
+  // Sizes and lengths chosen so every case contains births (the default
+  // world's first birth comes near gen 860), while keeping ./verify fast quick.
+  const Case cases[] = {{defaultParams(), 220, 140, 1, 0}, {stressParams(), 110, 70, 4, 0}, {chaos, 37, 23, 7, 15}};
+  for (const Case& c : cases) {
+    World a(c.W, c.H, c.seed), b(c.W, c.H, c.seed);
+    for (int g = 0; g < (c.W == 220 ? 1200 : 2500); g++) {
+      a.step(c.p); a.work(c.p, World::kUnlimited);
+      b.step(c.p); b.workLatency(c.p, 0, runSearch);
+      if (c.force && a.gen % c.force == 0) { a.forceEmerge(c.p); b.forceEmerge(c.p); }
+      if (!sameState(a, b)) { std::printf("latency-0: FAIL %dx%d seed %u at gen %d\n", c.W, c.H, c.seed, a.gen); return false; }
+    }
+  }
+  std::printf("latency-0: ok (L = 0 equals instant mode every gen: default, stress, chaos)\n");
+  return true;
+}
+
+// The point of the mode: running each search on a worker thread, launched
+// when the job appears and awaited at its landing generation, gives exactly
+// the world a synchronous run gives. Also: every search that is not
+// cancelled lands exactly L generations after it started.
+bool latencyThreadedIsSynchronous() {
+  const int L = 30;
+  Params chaos = defaultParams(); chaos.spark = 0.002; chaos.mutation = 5; chaos.extinction = 30;
+  struct Case { Params p; int W, H; uint32_t seed; };
+  const Case cases[] = {{stressParams(), 110, 70, 4}, {chaos, 64, 48, 3}};
+  long births = 0, onTime = 0, threaded = 0;
+  for (const Case& c : cases) {
+    World a(c.W, c.H, c.seed), b(c.W, c.H, c.seed);
+    std::map<uint64_t, std::shared_future<SearchOutcome>> pending;
+    const World::Resolver fromWorker = [&](const SearchJob& j) {
+      auto it = pending.find(j.id);
+      if (it == pending.end()) return runSearch(j);  // never launched: compute here (still exact)
+      threaded++;
+      return it->second.get();
+    };
+    int32_t startedAt = -1;
+    for (int g = 0; g < 3000; g++) {
+      a.step(c.p);
+      if (auto e = a.workLatency(c.p, L, runSearch); e && e->kind == Event::Birth) {
+        births++;
+        if (startedAt >= 0 && e->gen == startedAt + L) onTime++;
+      }
+      if (a.search && startedAt < 0) startedAt = a.search->startGen;
+      if (!a.search) startedAt = -1;
+      b.step(c.p);
+      b.workLatency(c.p, L, fromWorker);
+      if (const SearchJob* j = b.latencyJob(); j && !pending.count(j->id))
+        pending[j->id] = std::async(std::launch::async, runSearch, *j).share();
+      if (!sameState(a, b)) { std::printf("latency-threads: FAIL %dx%d seed %u at gen %d\n", c.W, c.H, c.seed, a.gen); return false; }
+    }
+  }
+  if (births == 0 || onTime != births || threaded == 0) {
+    std::printf("latency-threads: FAIL births %ld, landed at start+L %ld, resolved from worker %ld\n", births, onTime, threaded);
+    return false;
+  }
+  std::printf("latency-threads: ok (worker-thread run = synchronous run every gen; %ld births, all at start + %d; %ld resolved from the worker)\n",
+              births, L, threaded);
+  return true;
+}
+
 }  // namespace
 
 int main() {
   bool ok = determinism();
   ok = neverRepeat() && ok;
   ok = windowWraps() && ok;
+  ok = latencyZeroIsInstant() && ok;
+  ok = latencyThreadedIsSynchronous() && ok;
   return ok ? 0 : 1;
 }

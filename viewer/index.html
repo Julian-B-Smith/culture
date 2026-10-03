@@ -112,8 +112,8 @@
     <select id="profile"><option value="default">default</option><option value="stress">stress (sparks, mutation)</option></select>
     <label for="spf">speed</label>
     <select id="spf"><option value="1">1× (60 gens/s)</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16× (960 gens/s)</option></select>
-    <label for="slice">search</label>
-    <select id="slice"><option value="2">sliced (smooth)</option><option value="0">instant (as goldens)</option></select>
+    <label for="search">search</label>
+    <select id="search"><option value="worker">worker, lands +30 gens</option><option value="sliced">sliced (2 per gen)</option><option value="instant">instant (as goldens)</option></select>
     <label for="view">view</label>
     <select id="view"><option value="life">life</option><option value="territory">territory</option></select>
     <label for="markers">markers</label>
@@ -329,7 +329,7 @@ async function start() {
   palette.clear(); rings = []; logLines.length = 0; img = null; $('msg').textContent = '';
   resetSound(); rateGen = null; searchAt = null;
   const q = new URLSearchParams({ seed: $('seed').value || '1', size: $('size').value, profile: $('profile').value,
-                                  spf: $('spf').value, slice: $('slice').value, fps: '60' });
+                                  spf: $('spf').value, search: $('search').value, fps: '60' });
   let res;
   try { res = await fetch('/stream?' + q, { signal: controller.signal }); }
   catch (e) { if (e.name !== 'AbortError') $('msg').textContent = 'stream failed: ' + e.message; return; }
@@ -371,7 +371,7 @@ async function start() {
   } catch (e) { if (e.name !== 'AbortError') $('msg').textContent = 'stream error: ' + e.message; }
 }
 $('restart').addEventListener('click', start);
-for (const id of ['size', 'profile', 'slice', 'spf']) $(id).addEventListener('change', start);
+for (const id of ['size', 'profile', 'search', 'spf']) $(id).addEventListener('change', start);
 $('seed').addEventListener('keydown', e => { if (e.key === 'Enter') start(); });
 // Pause stops the simulation process itself (server SIGSTOP), so resuming
 // continues from exactly where it stopped, with no backlog.
