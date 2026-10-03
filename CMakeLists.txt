@@ -41,6 +41,11 @@ target_compile_options(culture_vectors PRIVATE -ffp-contract=off -fno-fast-math)
 add_executable(culture_properties tests/properties.cpp)
 target_link_libraries(culture_properties PRIVATE culture)
 
+# P4 evidence: how often each SPEC §8 quirk fires, and how screened rules
+# behave. Observes the World read-only; not part of ./verify.
+add_executable(culture_quirks analysis/quirks.cpp)
+target_link_libraries(culture_quirks PRIVATE culture)
+
 # Dev viewer (viewer/README.md): streams frames of the canonical core to
 # viewer/server.js. An adapter, so it may read the clock to pace frames.
 add_executable(culture_stream viewer/stream.cpp)

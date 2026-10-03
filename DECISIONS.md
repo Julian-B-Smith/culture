@@ -143,6 +143,25 @@ Each new gate was proven to fire on a plant: `0.8f` in `core/` turns deep[opt] r
 The browser prototype is frozen as the historical v1 demo. A WebAssembly build of libculture, so that a web viewer runs the one canonical core, is in the backlog.
 What changed in meaning: the oracle now guarantees "no unintended change", not "matches an independently written spec". Rejected: changing both JS and C++ (keeps the JS's semantics and costs binding every change), and C++ without `core_ref` (optimizations would be checked only against pins).
 
+**D-031: P4: the SPEC §8 quirks and the rule-screen review, decided (2026-10-02, human decisions by poll).**
+Evidence comes from `analysis/quirks.cpp` (`culture_quirks`). It observes the canonical core read-only over 16 seeds × 20,000 gens (default) and 8 × 10,000 (stress): 658 births and 102 extinctions before the changes.
+**Changed** (both cores, goldens regenerated and re-pinned in the same commit):
+- **#1 Retreating ground goes to the site's previous owner.** Before: it always went to tier idx−1. That tier was not the dying tier's parent in 38 of 102 retreats, covering 23–25% of returned ground. Now each site records who held it before it was claimed (index plus birth serial, so a reused index is detected) and reverts to that owner while it lives, otherwise to idx−1. This restores D-009's intent ("gives its ground back"). Measured after the change (stress): 25.7% of retreating cells return to a previous owner other than idx−1.
+- **#5 Surprise windows wrap the torus.** Before: centres excluded a 2-cell edge band (4.62% of sites) and windows did not wrap. Now `surpriseWindowMax` sums 5×5 windows over a wrapped grid for every site. The summation order is part of the bit-exact contract, so both cores call this one function. Unit-tested: blocks centred on corners and edges are found exactly; the old loop picks a site with sum 9 of 25. After the change (stress), 11 of 177 births were centred in the former band.
+- **#8 Spark cooldowns are keyed by birth serials,** not tier indices, and the serial is the identity for consumers (sound voices, UI). Before: 98 births reused an extinct index, and one inherited a dead tier's cooldown.
+**Kept and documented** (no change):
+- #2: spark, mutation and retreat steps skip the surprise pass (1.3–3% of gens).
+- #3: the record freezes while a search is pending. Never in instant mode; under live L = 30 it pauses decay for 30 gens per birth against a 2,512-gen half-life.
+- #4: a failed search multiplies the record by 1.05 (3 in 400k gens).
+- #6: `elx` is drawn for mutants (one discarded draw).
+- #9: the cooldown is stamped with the post-increment gen.
+- #10: float32 storage at the SPEC §1 sites. This is the precision contract.
+**Removed:** #7, the always-true reign guard. Dead code, with no output change; the C++ never had it.
+**Screen review:**
+- No explicit B2 exclusion: 0 of 658 accepted rules had B2, because the invasion-speed cap already rejects them, and an explicit rule would only reshuffle the search stream.
+- No complement equivalence: 0 of 658 births had their complement already used, and a complement rule behaves differently on a mostly-dead background.
+- Eppstein's growth/decay pre-screen and calibration against Yin 2026 are deferred to a measured experiment rather than changed blind.
+**Canonical:** the C++ core (D-030). SPEC.md stays as received (v0). The current semantics are SPEC plus D-031.
 **D-032: x^1.5 is computed portably; std::pow left the core (2026-10-02).**
 The first CI run of PR #7 failed `cpp_vectors`: glibc's `pow(k, 1.5)` hashed differently from the macOS-pinned value over k = 0…65,536. This is the cross-toolchain check of D-030 doing its job. Earlier runs passed only because the vectors were compared with node on the same machine. Measured with mpmath (300-bit) on macOS: `pow` is not correctly rounded at 89 integers (first k = 1,018), and glibc evidently differs somewhere too. The core now uses `pow15` (core/src/core.cpp): a double-double product x·√x that depends only on IEEE `sqrt` and `fma`. It is correctly rounded at every k in 0…65,536, so it gives the same bits on every platform. On every reachable value (excess = active − 2 ≤ 98, since an active tier holds ≥ 1% of the world) it equals macOS `pow` and V8, so **no golden or deep golden changed**. Only the pinned vector hash did, because it had pinned macOS's 89 misrounded values.
 Residual risk, recorded rather than hidden: the surprisal score still uses `std::log2`. 400,000 score-domain samples agree between macOS and glibc after the float32 store, but a 1-ulp double difference can in principle cross a float32 rounding boundary (roughly 2^-29 per evaluation). Over very long runs that could make the two platforms diverge. ROADMAP carries a follow-up: vendor a correctly rounded log2 (e.g. CORE-MATH), proven equal to the goldens, the way trig (D-027) and pow (here) were made portable.

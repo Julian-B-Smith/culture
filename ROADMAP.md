@@ -6,7 +6,7 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 
 ## Status
 
-- **Phase:** P4 — decide the quirks (current, chosen 2026-10-02). Done: P0, P1, PA0 (all 2026-10-02). P2 waits on the render-stack decision; PE1 is ready and independent.
+- **Phase:** none in progress. Done 2026-10-02: P0, P1, PA0, P4. Next is the human's pick: P2 (needs the render-stack decision), P5 (unblocked; design basis in D-029) or PE1.
 - **Oracle (C++ canonical since D-030):**
   - **What the gates check:** pinned C++ goldens and deep goldens, run for
     both the optimized core and the frozen naive `core/ref`; vectors and trig
@@ -88,8 +88,8 @@ hold **and** a `traces/` entry is written.
   dropouts; offline render of a fixed seed is bit-reproducible; **human signs
   off by ear** on register spread and riser level.
 
-### P4 — Decide the quirks ← current
-- **Status:** in progress (each item is a human call)
+### P4 — Decide the quirks
+- **Status:** done 2026-10-02 (D-030 C++ canonical; D-031 decisions; trace: traces/2026-10-02-p4-decisions.md)
 - **Agenda:**
   1. The ten SPEC §8 quirks.
   2. The rule-screen review (D-029, docs/prior-art.md recommendation 2):
@@ -106,7 +106,7 @@ hold **and** a `traces/` entry is written.
   implementation (JS or C++) is canonical from then on.
 
 ### P5 — Synthesis: recursive coarse-graining (chosen priority, D-021)
-- **Status:** blocked on P4 (PA0 done)
+- **Status:** open (P4 and PA0 done)
 - **Design basis (D-029, docs/prior-art.md §3):** Rosas, Mediano et al. 2020 Ψ,
   per 8×8 block, over a quantized block feature (start with live-cell count in
   8–16 bins), from plug-in counts. Deterministic, counts and logs only. Read Sas
@@ -158,7 +158,7 @@ hold **and** a `traces/` entry is written.
 
 ### Backlog (unprioritized; the human orders these)
 WebAssembly build of libculture for a web viewer that runs the ONE canonical
-core (D-030; the JS prototype is frozen); scanner sound / instrument mode (tempo, scale quantization, MIDI/OSC); branching
+core (D-030; the JS prototype is frozen); a measured screen experiment (Eppstein's growth/decay pre-screen, calibration against Yin 2026's census; D-031 deferred it); scanner sound / instrument mode (tempo, scale quantization, MIDI/OSC); branching
 history (tree of world states); recording and export; presets; GPU compute for
 very large worlds; other form factors (plugin, FOUNDATIONS module).
 
