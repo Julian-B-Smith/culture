@@ -32,6 +32,13 @@ entry of `.claude/launch.json`.
     modes are different (equally deterministic) worlds.
 - **view:** *life* shows live cells bright on their tier's dark ground;
   *territory* shows ownership only.
+- **Full screen** (button or `F`; `F` or `Esc` exits): the world alone, as
+  large as it fits, with a HUD (gen, tiers) that fades when the mouse is idle.
+  Where a host refuses real full screen or never completes the request (seen
+  in the Claude browser pane), an in-page mode fills the window instead.
+- **Space** pauses and resumes.
+- The world always scales to fill the space it has (fractional zoom, crisp
+  pixels). Integer-only zoom had left a 550×350 world at 1× on a laptop.
 - **Pause** stops the simulation process itself (the server sends SIGSTOP), so
   resuming continues exactly where it stopped. When the page only stopped
   reading, the core ran on until the OS buffers filled (~1,500 gens).
