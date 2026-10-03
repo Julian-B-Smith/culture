@@ -41,11 +41,13 @@ class World {
   std::vector<uint8_t> harm;
   std::vector<float> resist;
   std::vector<int32_t> claimed;
+  std::vector<uint16_t> prevTier;   // previous owner per site (D-031)
+  std::vector<uint64_t> prevSerial;
   std::vector<float> score;
   std::vector<double> integral;
 
   std::vector<Tier> tiers, extinct;
-  std::unordered_map<int32_t, int32_t> sparkLast;  // pair key -> generation
+  std::unordered_map<uint64_t, int32_t> sparkLast;  // keyed by birth serials (D-031)
   std::unordered_set<uint32_t> usedRules;  // Rule::key(); no rule is ever used twice
 
   int32_t gen = 0, lastBirth = 0, reignStart = 0;
