@@ -13,5 +13,6 @@ lives in [README.md §Map](README.md#map); this file adds the harness.
 - `traces/`: one entry per merged change.
 - `.claude/`: hooks, agents (implementer=sonnet, verifier=haiku, critic=opus), provenance skill.
 - `.github/workflows/ci.yml`: runs `./verify fast` on Linux.
+- `viewer/`: dev visualizer (`.claude/launch.json` entry `viewer`, port 5180).
 - `core/` (canonical) + `core/ref/` (frozen naive oracle), `trace/`, `tests/`, `analysis/`, `CMakeLists.txt`; see README §Map. C++ is canonical since D-030.
 - Planned (P2+): `audio/`, `app/` per docs/handoff/PORT_PLAN.md.

@@ -40,3 +40,8 @@ target_compile_options(culture_vectors PRIVATE -ffp-contract=off -fno-fast-math)
 
 add_executable(culture_properties tests/properties.cpp)
 target_link_libraries(culture_properties PRIVATE culture)
+
+# Dev viewer (viewer/README.md): streams frames of the canonical core to
+# viewer/server.js. An adapter, so it may read the clock to pace frames.
+add_executable(culture_stream viewer/stream.cpp)
+target_link_libraries(culture_stream PRIVATE culture)

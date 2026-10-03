@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Culture Viewer</title>
+<style>
+  /* Dev viewer for the canonical C++ core (viewer/README.md). Single dark
+     "lab instrument" look, after the v0 prototype. */
+  :root {
+    color-scheme: dark;
+    --ground: #0d0f17; --panel: #151826; --line: #262a3d; --ink: #e6e4ef;
+    --muted: #8d8aa3; --signal: #f2b84b; --bad: #ef6f6c;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--ground); color: var(--ink); font: 13px/1.4 var(--sans);
+         display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto 1fr; }
+  header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+           padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; letter-spacing: .02em; }
+  header h1 span { color: var(--muted); font-weight: 400; }
+  .stat { font-family: var(--mono); color: var(--muted); }
+  .stat b { color: var(--ink); font-weight: 500; }
+  .stat .live { color: var(--signal); }
+  #stage { position: relative; display: flex; align-items: center; justify-content: center; padding: 16px; min-height: 0; }
+  #wrap { position: relative; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; border: 1px solid var(--line); }
+  #rings { position: absolute; inset: 0; pointer-events: none; image-rendering: auto; border-color: transparent; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 12px 14px; }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 0 8px; }
+  aside h2:first-child { margin-top: 0; }
+  .controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+  .controls label { color: var(--muted); }
+  input, select, button { font: inherit; color: var(--ink); background: var(--ground); border: 1px solid var(--line);
+                          border-radius: 4px; padding: 4px 6px; min-width: 0; }
+  button { cursor: pointer; }
+  button:hover, select:hover, input:hover { border-color: #3a3f5a; }
+  button.primary { background: var(--signal); color: #1a1406; border-color: var(--signal); font-weight: 600; }
+  .row { display: flex; gap: 6px; margin-top: 8px; }
+  .row > * { flex: 1; }
+  .tier { display: grid; grid-template-columns: 12px 1fr auto; gap: 2px 8px; align-items: center;
+          padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .tier .sw { width: 12px; height: 12px; border-radius: 3px; }
+  .tier .rule { font-family: var(--mono); }
+  .tier .meta { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; }
+  .tier .pct { font-family: var(--mono); color: var(--muted); }
+  .tier .bar { grid-column: 2 / -1; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .tier .bar i { display: block; height: 100%; }
+  .tier.dying { opacity: .55; }
+  #log { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  #log div { padding: 2px 0; }
+  #msg { color: var(--bad); font-family: var(--mono); }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 6px; }
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Culture <span>· canonical C++ core</span></h1>
+  <div class="stat">gen <b id="gen">–</b></div>
+  <div class="stat">tiers <b id="ntiers">–</b></div>
+  <div class="stat">active <b id="active">–</b></div>
+  <div class="stat">surprisal <b id="lastmax">–</b> / record <b id="record">–</b></div>
+  <div class="stat" id="status"></div>
+  <div class="stat">fps <b id="fps">–</b></div>
+  <div id="msg"></div>
+</header>
+<main id="stage"><div id="wrap"><canvas id="world"></canvas><canvas id="rings"></canvas></div></main>
+<aside>
+  <h2>World</h2>
+  <div class="controls">
+    <label for="seed">seed</label><input id="seed" type="number" min="0" value="1">
+    <label for="size">size</label>
+    <select id="size"><option>165x105</option><option selected>220x140</option><option>330x210</option><option>440x280</option><option>550x350</option></select>
+    <label for="profile">profile</label>
+    <select id="profile"><option value="default">default</option><option value="stress">stress (sparks, mutation)</option></select>
+    <label for="spf">speed</label>
+    <select id="spf"><option value="1">1 gen / frame</option><option value="2">2</option><option value="4">4</option><option value="8">8</option><option value="16">16</option></select>
+    <label for="slice">search</label>
+    <select id="slice"><option value="8">sliced (smooth)</option><option value="0">instant (as goldens)</option></select>
+    <label for="view">view</label>
+    <select id="view"><option value="life">life</option><option value="territory">territory</option></select>
+  </div>
+  <div class="row"><button class="primary" id="restart">Restart</button><button id="pause">Pause</button></div>
+  <div class="hint">Same seed + size + profile + search mode = the same world, every time.</div>
+  <h2>Tiers</h2>
+  <div id="ledger"></div>
+  <h2>Events</h2>
+  <div id="log"></div>
+</aside>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const FAMILY = ['ash', 'ember', 'gold', 'moss', 'tide', 'violet'];
+const HUE = [220, 14, 44, 122, 188, 278];
+const KIND = ['surprise', 'spark', 'mutation', 'origin'];
+
+// Colours exactly as the v0 prototype (reference/ui.js colorOf): the hue comes
+// from the colour family plus a small per-tier shift keyed by BIRTH ORDER, which
+// here is the tier's birth serial (D-031: indices are reused, serials never).
+function hsl(h, s, l) {
+  s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+const palette = new Map();
+function colorOf(serial, el) {
+  if (palette.has(serial)) return palette.get(serial);
+  const base = el === 0, key = serial;
+  const h = (HUE[el] + (key === 0 ? 0 : ((key * 37) % 25) - 12) + 360) % 360;
+  const c = { live: hsl(h, base ? 22 : 82, base ? 80 : 58 + (key % 3) * 6),
+              dead: hsl(h, base ? 18 : 42, base ? 8 : 10 + (key % 3)),
+              css: `hsl(${h.toFixed(0)} ${base ? 22 : 82}% ${base ? 75 : 60}%)` };
+  palette.set(serial, c);
+  return c;
+}
+const ruleStr = (b, s) => { let B = '', S = ''; for (let n = 0; n < 9; n++) { if ((b >> n) & 1) B += n; if ((s >> n) & 1) S += n; } return `B${B}/S${S}`; };
+
+// ---- frame parsing (format: viewer/stream.cpp) ----
+function parse(buf) {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let o = 0;
+  const u8 = () => dv.getUint8(o++), u16 = () => { const v = dv.getUint16(o, true); o += 2; return v; };
+  const u32 = () => { const v = dv.getUint32(o, true); o += 4; return v; }, f64 = () => { const v = dv.getFloat64(o, true); o += 8; return v; };
+  if (u8() !== 67 || u8() !== 70) throw new Error('bad frame magic');
+  u8(); u8();
+  const f = { gen: u32(), W: u16(), H: u16() };
+  const nT = u16(), nE = u16();
+  f.record = f64(); f.lastMax = f64(); f.retreat = u8(); f.search = u8(); f.active = u16();
+  f.tiers = [];
+  for (let k = 0; k < nT; k++) f.tiers.push({ serial: u32(), idx: u16(), el: u8(), dying: u8() & 1, born: u16(), survive: u16(), cells: u32(), gen: u32(), kind: u8() });
+  f.events = [];
+  for (let k = 0; k < nE; k++) f.events.push({ kind: u8(), tier: u16(), x: u16(), y: u16(), gen: u32() });
+  f.grid = buf.subarray(o, o + f.W * f.H);
+  return f;
+}
+
+// ---- drawing ----
+const cv = $('world'), ctx = cv.getContext('2d'), rc = $('rings'), rctx = rc.getContext('2d');
+let img = null, rings = [], scale = 1;
+function fit(W, H) {
+  const stage = $('stage'), pad = 32;
+  scale = Math.max(1, Math.floor(Math.min((stage.clientWidth - pad) / W, (stage.clientHeight - pad) / H)));
+  if (!Number.isFinite(scale) || scale < 1) scale = 1;
+  for (const c of [cv, rc]) { c.style.width = W * scale + 'px'; c.style.height = H * scale + 'px'; }
+  cv.width = W; cv.height = H; rc.width = W * scale; rc.height = H * scale;
+  img = ctx.createImageData(W, H);
+}
+function draw(f) {
+  if (!img || cv.width !== f.W || cv.height !== f.H) fit(f.W, f.H);
+  const byIdx = [];
+  for (const t of f.tiers) byIdx[t.idx] = colorOf(t.serial, t.el);
+  const px = img.data, g = f.grid, life = $('view').value === 'life';
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) {
+    const c = byIdx[g[i] >> 1] || byIdx[0], col = life ? ((g[i] & 1) ? c.live : c.dead) : c.live;
+    px[j] = col[0]; px[j + 1] = col[1]; px[j + 2] = col[2]; px[j + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  // Birth rings (as the prototype's markers): expand and fade over ~1.5 s.
+  rctx.clearRect(0, 0, rc.width, rc.height);
+  rings = rings.filter(r => (r.age += 1) < 45);
+  for (const r of rings) {
+    rctx.strokeStyle = r.css; rctx.globalAlpha = 1 - r.age / 45; rctx.lineWidth = 2;
+    rctx.beginPath(); rctx.arc((r.x + .5) * scale, (r.y + .5) * scale, (6 + r.age * .6) * scale, 0, 2 * Math.PI); rctx.stroke();
+  }
+  rctx.globalAlpha = 1;
+}
+
+// ---- side panel ----
+let lastLedger = 0;
+function ledger(f) {
+  const n = f.W * f.H, rows = [];
+  for (const t of f.tiers) {
+    const c = colorOf(t.serial, t.el), pct = 100 * t.cells / n;
+    rows.push(`<div class="tier${t.dying ? ' dying' : ''}"><div class="sw" style="background:${c.css}"></div>` +
+      `<div class="rule">${t.idx} · ${ruleStr(t.born, t.survive)}</div><div class="pct">${pct.toFixed(1)}%</div>` +
+      `<div class="meta">${FAMILY[t.el]} · ${KIND[t.kind]}${t.idx ? ' · born gen ' + t.gen.toLocaleString() : ''}${t.dying ? ' · retreating' : ''}</div>` +
+      `<div class="bar"><i style="width:${Math.min(100, pct)}%;background:${c.css}"></i></div></div>`);
+  }
+  $('ledger').innerHTML = rows.join('');
+}
+const logLines = [];
+function events(f) {
+  for (const e of f.events) {
+    const t = f.tiers.find(t => t.idx === e.tier);
+    if (e.kind === 1 && t) {
+      const c = colorOf(t.serial, t.el);
+      rings.push({ x: e.x, y: e.y, age: 0, css: c.css });
+      logLines.unshift(`${e.gen.toLocaleString()}  birth #${e.tier} ${ruleStr(t.born, t.survive)} (${KIND[t.kind]})`);
+    } else if (e.kind === 2) logLines.unshift(`${e.gen.toLocaleString()}  tier ${e.tier} dying`);
+    else if (e.kind === 3) logLines.unshift(`${e.gen.toLocaleString()}  tier ${e.tier} extinct`);
+  }
+  logLines.length = Math.min(logLines.length, 14);
+  $('log').innerHTML = logLines.map(l => `<div>${l}</div>`).join('') || '<div>—</div>';
+}
+function header(f) {
+  $('gen').textContent = f.gen.toLocaleString();
+  $('ntiers').textContent = f.tiers.length;
+  $('active').textContent = f.active;
+  $('lastmax').textContent = f.lastMax.toFixed(1);
+  $('record').textContent = f.record.toFixed(1);
+  $('status').innerHTML = f.retreat ? '<b class="live">retreat</b>' : f.search ? '<b class="live">searching…</b>' : '';
+}
+
+// ---- streaming ----
+let controller = null, paused = false, frames = 0, fpsT = performance.now(), streamId = null;
+async function start() {
+  if (controller) controller.abort();
+  controller = new AbortController();
+  palette.clear(); rings = []; logLines.length = 0; img = null; $('msg').textContent = '';
+  const q = new URLSearchParams({ seed: $('seed').value || '1', size: $('size').value, profile: $('profile').value,
+                                  spf: $('spf').value, slice: $('slice').value, fps: '30' });
+  let res;
+  try { res = await fetch('/stream?' + q, { signal: controller.signal }); }
+  catch (e) { if (e.name !== 'AbortError') $('msg').textContent = 'stream failed: ' + e.message; return; }
+  if (!res.ok) { $('msg').textContent = await res.text(); return; }
+  streamId = res.headers.get('x-stream-id');
+  if (paused) { paused = false; $('pause').textContent = 'Pause'; }
+  const reader = res.body.getReader();
+  let buf = new Uint8Array(0);
+  const mine = controller;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done || mine !== controller) break;
+      const nb = new Uint8Array(buf.length + value.length); nb.set(buf); nb.set(value, buf.length); buf = nb;
+      let latest = null;
+      while (buf.length >= 4) {
+        const len = new DataView(buf.buffer, buf.byteOffset).getUint32(0, true);
+        if (buf.length < 4 + len) break;
+        const f = parse(buf.subarray(4, 4 + len));
+        events(f);           // never drop events, even when frames are skipped
+        latest = f;
+        buf = buf.slice(4 + len);
+      }
+      if (latest) {
+        draw(latest); header(latest);
+        const now = performance.now();
+        if (now - lastLedger > 250) { ledger(latest); lastLedger = now; }
+        frames++;
+        if (now - fpsT > 1000) { $('fps').textContent = (frames * 1000 / (now - fpsT)).toFixed(0); frames = 0; fpsT = now; }
+      }
+    }
+  } catch (e) { if (e.name !== 'AbortError') $('msg').textContent = 'stream error: ' + e.message; }
+}
+$('restart').addEventListener('click', start);
+for (const id of ['size', 'profile', 'slice', 'spf']) $(id).addEventListener('change', start);
+$('seed').addEventListener('keydown', e => { if (e.key === 'Enter') start(); });
+// Pause stops the simulation process itself (server SIGSTOP), so resuming
+// continues from exactly where it stopped, with no backlog.
+$('pause').addEventListener('click', async () => {
+  if (!streamId) return;
+  paused = !paused;
+  $('pause').textContent = paused ? 'Resume' : 'Pause';
+  await fetch(`/control?id=${streamId}&op=${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+});
+window.addEventListener('resize', () => { img = null; });
+start();
+</script>
+</body>
+</html>
