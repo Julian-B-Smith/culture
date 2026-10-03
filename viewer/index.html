@@ -45,6 +45,8 @@
   aside h2:first-child { margin-top: 0; }
   .controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
   .controls label { color: var(--muted); }
+  .controls label.check { color: var(--ink); display: flex; gap: 6px; align-items: center; }
+  .controls label.check input { width: auto; margin: 0; }
   input, select, button { font: inherit; color: var(--ink); background: var(--ground); border: 1px solid var(--line);
                           border-radius: 4px; padding: 4px 6px; min-width: 0; }
   button { cursor: pointer; }
@@ -94,6 +96,7 @@
   <div class="stat">surprisal <b id="lastmax">–</b> / record <b id="record">–</b></div>
   <div class="stat" id="status"></div>
   <div class="stat">fps <b id="fps">–</b></div>
+  <div class="stat" title="generations per second achieved / target">gens/s <b id="rate">–</b></div>
   <button id="full" title="Full screen (F)">Full screen</button>
   <div id="msg"></div>
 </header>
@@ -108,11 +111,13 @@
     <label for="profile">profile</label>
     <select id="profile"><option value="default">default</option><option value="stress">stress (sparks, mutation)</option></select>
     <label for="spf">speed</label>
-    <select id="spf"><option value="1">1 gen / frame</option><option value="2">2</option><option value="4">4</option><option value="8">8</option><option value="16">16</option></select>
+    <select id="spf"><option value="1">1× (60 gens/s)</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16× (960 gens/s)</option></select>
     <label for="slice">search</label>
-    <select id="slice"><option value="8">sliced (smooth)</option><option value="0">instant (as goldens)</option></select>
+    <select id="slice"><option value="2">sliced (smooth)</option><option value="0">instant (as goldens)</option></select>
     <label for="view">view</label>
     <select id="view"><option value="life">life</option><option value="territory">territory</option></select>
+    <label for="markers">markers</label>
+    <label class="check"><input id="markers" type="checkbox" checked> birth rings + search ring (M)</label>
   </div>
   <div class="row"><button class="primary" id="restart">Restart</button><button id="pause">Pause</button></div>
   <div class="row"><button id="sound">Sound: off</button><input id="volume" type="range" min="0" max="1" step="0.01" value="0.7" aria-label="volume"></div>
@@ -184,7 +189,7 @@ function parse(buf) {
 
 // ---- drawing ----
 const cv = $('world'), ctx = cv.getContext('2d'), rc = $('rings'), rctx = rc.getContext('2d');
-let img = null, rings = [], scale = 1;
+let img = null, rings = [], scale = 1, searchAt = null;
 // Fill the stage at any (fractional) zoom; `image-rendering: pixelated` keeps
 // cells crisp. (Integer-only zoom left a 550x350 world at 1x on a laptop.)
 // The ring overlay is drawn at device resolution so rings stay smooth.
@@ -209,12 +214,19 @@ function draw(f) {
     px[j] = col[0]; px[j + 1] = col[1]; px[j + 2] = col[2]; px[j + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  // Birth rings (as the prototype's markers): expand and fade over ~1.5 s.
+  // Markers, as in the prototype: birth rings expand and fade over ~1.5 s,
+  // and a dashed ring marks where a rule search is running. Toggle with M.
   rctx.clearRect(0, 0, rc.width, rc.height);
-  rings = rings.filter(r => (r.age += 1) < 45);
+  rings = rings.filter(r => (r.age += 1) < 90);
+  if (!$('markers').checked) return;
+  if (f.search && searchAt) {
+    rctx.setLineDash([4 * (scale / 3 + 1), 4 * (scale / 3 + 1)]); rctx.strokeStyle = 'rgba(242,184,75,.85)'; rctx.lineWidth = 1.5;
+    rctx.beginPath(); rctx.arc((searchAt.x + .5) * scale, (searchAt.y + .5) * scale, 9 * scale, 0, 2 * Math.PI); rctx.stroke();
+    rctx.setLineDash([]);
+  }
   for (const r of rings) {
-    rctx.strokeStyle = r.css; rctx.globalAlpha = 1 - r.age / 45; rctx.lineWidth = 2;
-    rctx.beginPath(); rctx.arc((r.x + .5) * scale, (r.y + .5) * scale, (6 + r.age * .6) * scale, 0, 2 * Math.PI); rctx.stroke();
+    rctx.strokeStyle = r.css; rctx.globalAlpha = 1 - r.age / 90; rctx.lineWidth = 2;
+    rctx.beginPath(); rctx.arc((r.x + .5) * scale, (r.y + .5) * scale, (6 + r.age * .3) * scale, 0, 2 * Math.PI); rctx.stroke();
   }
   rctx.globalAlpha = 1;
 }
@@ -240,6 +252,7 @@ function ledger(f) {
 const logLines = [];
 function events(f) {
   for (const e of f.events) {
+    if (e.kind === 0) { searchAt = { x: e.x, y: e.y }; continue; }
     const t = f.tiers.find(t => t.idx === e.tier);
     if (e.kind === 1 && t) {
       const c = colorOf(t.serial, t.el);
@@ -290,7 +303,7 @@ function soundWorld(f) {
            retreat: f.retreat ? { dur: f.retreatDur } : null, search: !!f.search, record: f.record, lastMax: f.lastMax,
            frontierAge: f.frontierAge, warm: f.warm, lastBirth: f.lastBirth, meanEpoch: f.meanEpoch };
 }
-const soundParams = () => ({ speed: Number($('spf').value) / 2, hardness: 3, margin: 0.04, warmup: 300 });
+const soundParams = () => ({ speed: Number($('spf').value), hardness: 3, margin: 0.04, warmup: 300 });
 function soundFrame(f) {
   const world = soundWorld(f);
   if (!soundOn) return world;
@@ -309,14 +322,14 @@ $('sound').addEventListener('click', () => {
 $('volume').addEventListener('input', () => sonic.setVolume(Number($('volume').value)));
 
 // ---- streaming ----
-let controller = null, paused = false, frames = 0, fpsT = performance.now(), streamId = null;
+let controller = null, paused = false, frames = 0, fpsT = performance.now(), streamId = null, rateGen = null;
 async function start() {
   if (controller) controller.abort();
   controller = new AbortController();
   palette.clear(); rings = []; logLines.length = 0; img = null; $('msg').textContent = '';
-  resetSound();
+  resetSound(); rateGen = null; searchAt = null;
   const q = new URLSearchParams({ seed: $('seed').value || '1', size: $('size').value, profile: $('profile').value,
-                                  spf: $('spf').value, slice: $('slice').value, fps: '30' });
+                                  spf: $('spf').value, slice: $('slice').value, fps: '60' });
   let res;
   try { res = await fetch('/stream?' + q, { signal: controller.signal }); }
   catch (e) { if (e.name !== 'AbortError') $('msg').textContent = 'stream failed: ' + e.message; return; }
@@ -347,7 +360,12 @@ async function start() {
         const now = performance.now();
         if (now - lastLedger > 250) { ledger(latest); lastLedger = now; }
         frames++;
-        if (now - fpsT > 1000) { $('fps').textContent = (frames * 1000 / (now - fpsT)).toFixed(0); frames = 0; fpsT = now; }
+        if (now - fpsT > 1000) {
+          $('fps').textContent = (frames * 1000 / (now - fpsT)).toFixed(0);
+          // Achieved vs target generation rate: makes lag visible and attributable.
+          if (rateGen !== null) $('rate').textContent = `${Math.round((latest.gen - rateGen) * 1000 / (now - fpsT))} / ${Number($('spf').value) * 60}`;
+          rateGen = latest.gen; frames = 0; fpsT = now;
+        }
       }
     }
   } catch (e) { if (e.name !== 'AbortError') $('msg').textContent = 'stream error: ' + e.message; }
@@ -387,10 +405,13 @@ async function toggleFull() {
 let enteredAt = 0;
 $('full').addEventListener('click', toggleFull);
 document.addEventListener('keydown', e => {
-  if (e.target.matches('input, select')) return;
+  // Typing into a field must not trigger shortcuts. (The target can be the
+  // document itself, which has no .matches, so check it is an Element.)
+  if (e.target instanceof Element && e.target.matches('input:not([type=checkbox]), select')) return;
   if (e.key === 'f' || e.key === 'F') toggleFull();
   else if (e.key === 'Escape' && stage.classList.contains('theater')) toggleFull();
   else if (e.key === ' ') { e.preventDefault(); $('pause').click(); }
+  else if (e.key === 'm' || e.key === 'M') { $('markers').checked = !$('markers').checked; }
 });
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && performance.now() - enteredAt < 500) stage.classList.add('theater');

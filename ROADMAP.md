@@ -73,6 +73,13 @@ hold **and** a `traces/` entry is written.
   take 74–274 ms (critic). That is the case for the worker thread and
   deterministic latency L = 30. `World` state is public and mutable; give the
   UI and audio a read-only snapshot rather than the `World` itself.
+- **Carried from the dev viewer (2026-10-03, traces/2026-10-03-viewer-perf.md):**
+  - A single thread at ~1–1.5 ms/step reaches 60 gens/s at any size but not
+    16× (508 of 960 gens/s at 220×140 under load).
+  - Rare stalls of 120–725 ms remain, part search and part OS scheduling.
+  - The P2 answers are a search worker with deterministic latency (needs a
+    core API split: a pure candidate search, then placement at trigger + L)
+    and a multithreaded step that core/ref must still match bit for bit.
 - **Blocking open question (ask the human at the gate):** rendering/windowing
   stack (SDL3, sokol, JUCE, raylib, …) — decide after a small spike (D-021).
 - **Acceptance:** PORT_PLAN P2 — all prototype controls and views; search timing

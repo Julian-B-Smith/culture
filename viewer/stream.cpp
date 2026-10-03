@@ -4,12 +4,22 @@
 //   culture_stream [--size WxH] [--seed S] [--profile default|stress]
 //                  [--spf N] [--fps F] [--slice K]
 //
-// --spf  generations stepped per frame (speed); default 1
-// --fps  frames per second written; default 30
+// --spf  speed: generations per frame at 60 fps (the prototype's meaning);
+//        the target rate is spf * 60 gens/s whatever --fps is. Default 1.
+// --fps  frames per second written; default 60
 // --slice K: work(p, K) once per generation (sliced search, smooth); 0 =
 //        instant search, as the goldens use (a birth can stall a frame).
+//        Default 2: each candidate is a 280-gen test run (1-2 ms), and the
+//        old default of 8 per generation could cost 250 ms in one frame.
 //        Either way the world is a pure function of (seed, size, profile,
-//        slice): the pacing below only decides WHEN frames are written.
+//        slice): pacing only decides how many generations pass between
+//        frames, never what happens in them.
+//
+// Pacing: each frame, step toward the target rate but stop at a ~12 ms
+// budget, then ALWAYS write the frame. A slow stretch slows the simulation
+// instead of freezing the picture; the deficit is dropped, not repaid in a
+// burst. (The first version stepped a fixed spf per frame, so one slow
+// generation stalled the display.)
 //
 // This is a dev tool, not the P2 viewer (its render stack is undecided). It
 // reads the clock to pace frames, which is allowed here: it is an adapter
@@ -58,7 +68,7 @@ int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 }  // namespace
 
 int main(int argc, char** argv) {
-  int W = 220, H = 140, spf = 1, fps = 30, slice = 8;
+  int W = 220, H = 140, spf = 1, fps = 60, slice = 2;
   uint32_t seed = 1;
   std::string profile = "default";
   for (int i = 1; i + 1 < argc; i += 2) {
@@ -78,13 +88,21 @@ int main(int argc, char** argv) {
 
   std::vector<Event> events;
   Out o;
+  using clock = std::chrono::steady_clock;
   const auto period = std::chrono::microseconds(1000000 / fps);
-  auto next = std::chrono::steady_clock::now();
+  const auto stepBudget = std::chrono::microseconds(std::min<long>(12000, 1000000L / fps * 3 / 4));
+  const double gensPerFrame = double(spf) * 60.0 / fps;
+  double owed = 0;
+  auto next = clock::now();
   for (;;) {
     events.clear();
-    for (int s = 0; s < spf; s++) {
+    owed += gensPerFrame;
+    const auto frameStart = clock::now();
+    while (owed >= 1) {
       if (auto e = w.step(p)) events.push_back(*e);
       if (auto e = w.work(p, budget)) events.push_back(*e);
+      owed -= 1;
+      if (clock::now() - frameStart > stepBudget) { owed = std::min(owed, 1.0); break; }  // drop the deficit
     }
     o.b.clear();
     o.u8('C'); o.u8('F'); o.u8(2); o.u8(0);
@@ -120,7 +138,7 @@ int main(int argc, char** argv) {
     if (std::fwrite(&len, 4, 1, stdout) != 1 || std::fwrite(o.b.data(), 1, o.b.size(), stdout) != o.b.size()) return 0;
     if (std::fflush(stdout) != 0) return 0;
     next += period;
-    const auto now = std::chrono::steady_clock::now();
+    const auto now = clock::now();
     if (next < now) next = now;  // a slow step (instant search) drops pace, never bursts
     std::this_thread::sleep_until(next);
   }

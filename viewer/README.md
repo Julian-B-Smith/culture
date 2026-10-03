@@ -29,9 +29,14 @@ entry of `.claude/launch.json`.
 
 - **seed / size / profile:** which world. The same seed, size, profile and
   search mode give the same world every time. Changing any of them restarts.
-- **speed:** generations per frame at 30 fps.
+- **speed:** as in the prototype: 1× = 60 gens/s (1 generation per frame at
+  60 fps), up to 16× = 960 gens/s. The header shows **gens/s achieved /
+  target**, so lag is visible: if the machine cannot keep up, the simulation
+  slows down while the picture stays at ~60 fps.
 - **search:**
-  - **sliced** runs `work(p, 8)` once per generation: smooth.
+  - **sliced** runs `work(p, 2)` once per generation: smooth. Each candidate
+    is a 280-generation test run of 1–2 ms. The first version ran 8 per
+    generation and could spend 250 ms in one frame.
   - **instant** finishes each rule search inside its generation, as the goldens
     do. A birth can stall a frame at large sizes.
   - Sliced births land a few generations later than instant ones, so the two
@@ -43,6 +48,9 @@ entry of `.claude/launch.json`.
   Where a host refuses real full screen or never completes the request (seen
   in the Claude browser pane), an in-page mode fills the window instead.
 - **Space** pauses and resumes.
+- **markers** (checkbox or `M`), as in the prototype: rings mark births, and
+  a dashed ring marks where a rule search is running (sliced mode only;
+  instant searches finish inside a generation).
 - The side panel stays put: the tier list and the event log each scroll in
   their own box, so a long run with dozens of tiers never pushes the controls
   out of sight. The tier box keeps its scroll position as it updates.
@@ -58,9 +66,11 @@ births.
 
 ## Files
 
-- `stream.cpp`: the frame writer (format documented at the top). It reads
-  the clock to pace frames, which is allowed: it is an adapter, and the core
-  never sees the time.
+- `stream.cpp`: the frame writer (format documented at the top). Each frame
+  it steps toward the target rate within a ~12 ms budget, then always writes
+  the frame. It reads the clock to pace, which is allowed: it is an adapter,
+  and the core never sees the time. Pacing changes how many generations pass
+  between frames, never what happens in them.
 - `server.js`: serves the page and `/sound.js` (the frozen engine), spawns one `culture_stream` per viewer with
   whitelisted arguments (no shell), and POST `/control` pauses or resumes it.
 - `index.html`: parsing, drawing, ledger, event log.

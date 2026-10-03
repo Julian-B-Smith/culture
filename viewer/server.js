@@ -28,8 +28,8 @@ function streamArgs(q) {
   const size = sizes.includes(q.get('size')) ? q.get('size') : '220x140';
   const profile = q.get('profile') === 'stress' ? 'stress' : 'default';
   return ['--size', size, '--seed', String(int('seed', 0, 4294967295, 1)), '--profile', profile,
-    '--spf', String(int('spf', 1, 64, 1)), '--fps', String(int('fps', 1, 60, 30)),
-    '--slice', String(int('slice', 0, 800, 8))];
+    '--spf', String(int('spf', 1, 64, 1)), '--fps', String(int('fps', 1, 60, 60)),
+    '--slice', String(int('slice', 0, 800, 2))];
 }
 
 // Live streams by id, so /control can pause one. Pausing must stop the
