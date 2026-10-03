@@ -15,12 +15,18 @@
 // reads the clock to pace frames, which is allowed here: it is an adapter
 // outside core/, and the simulation never sees the time.
 //
-// Frame format (little-endian), preceded by a u32 byte length of the rest:
-//   "CF" u8 version=1 u8 0 | u32 gen | u16 W | u16 H | u16 nTiers | u16 nEvents
+// Frame format v2 (little-endian), preceded by a u32 byte length of the rest:
+//   "CF" u8 version=2 u8 0 | u32 gen | u16 W | u16 H | u16 nTiers | u16 nEvents
 //   f64 record | f64 lastMax | u8 retreat | u8 search | u16 active
+//   i32 frontierAge | f64 warm | i32 lastBirth | f64 meanEpoch | u16 retreatDur
 //   nTiers  x { u32 serial, u16 idx, u8 el, u8 flags(1=dying), u16 born,
 //               u16 survive, u32 cells, u32 birthGen, u8 kind(0 surprise,
-//               1 spark, 2 mutation, 3 origin) }
+//               1 spark, 2 mutation, 3 origin), u32 hash, i16 from,
+//               i16 mutatedFrom, i16 parentA, i16 parentB (-1 = none),
+//               i16 originX, i16 originY (-1 = none) }
+//   u16 nStats x { u32 live, u32 move, u32 fed, f64 cos, f64 sin, f64 cosY,
+//                  f64 sinY, f64 contest, f64 wall }   (per tier, as the
+//                  last step computed them; read by the sound engine)
 //   nEvents x { u8 kind(0 searching,1 birth,2 dying,3 extinct), u16 tier,
 //               u16 x, u16 y, u32 gen }
 //   W*H bytes: (min(tier, 127) << 1) | alive
@@ -43,6 +49,7 @@ struct Out {
   void u8(uint8_t v) { b.push_back(v); }
   void u16(uint16_t v) { u8(uint8_t(v)); u8(uint8_t(v >> 8)); }
   void u32(uint32_t v) { u16(uint16_t(v)); u16(uint16_t(v >> 16)); }
+  void i16(int v) { u16(uint16_t(int16_t(v))); }
   void f64(double v) { uint64_t u; std::memcpy(&u, &v, 8); u32(uint32_t(u)); u32(uint32_t(u >> 32)); }
 };
 
@@ -80,15 +87,26 @@ int main(int argc, char** argv) {
       if (auto e = w.work(p, budget)) events.push_back(*e);
     }
     o.b.clear();
-    o.u8('C'); o.u8('F'); o.u8(1); o.u8(0);
+    o.u8('C'); o.u8('F'); o.u8(2); o.u8(0);
     o.u32(uint32_t(w.gen)); o.u16(uint16_t(W)); o.u16(uint16_t(H));
     o.u16(uint16_t(w.tiers.size())); o.u16(uint16_t(events.size()));
     o.f64(w.record); o.f64(w.lastMax);
     o.u8(w.retreat ? 1 : 0); o.u8(w.search ? 1 : 0); o.u16(uint16_t(w.active));
+    o.u32(uint32_t(w.frontierAge)); o.f64(w.hasWarm ? w.warm : p.warmup); o.u32(uint32_t(w.lastBirth));
+    o.f64(w.meanEpoch); o.u16(uint16_t(w.retreat ? w.retreat->dur : 0));
     for (const Tier& t : w.tiers) {
       o.u32(uint32_t(t.serial)); o.u16(uint16_t(t.idx)); o.u8(t.el); o.u8(t.dying ? 1 : 0);
       o.u16(t.rule.born); o.u16(t.rule.survive); o.u32(t.cells); o.u32(uint32_t(t.gen));
       o.u8(t.idx == 0 ? 3 : t.mutatedFrom >= 0 ? 2 : t.hasParents ? 1 : 0);
+      o.u32(t.hash); o.i16(t.idx == 0 ? -1 : t.from); o.i16(t.mutatedFrom);
+      o.i16(t.hasParents ? t.parents[0] : -1); o.i16(t.hasParents ? t.parents[1] : -1);
+      o.i16(t.hasOrigin ? t.origin[0] : -1); o.i16(t.hasOrigin ? t.origin[1] : -1);
+    }
+    const Stats& S = w.stats;
+    o.u16(uint16_t(S.live.size()));
+    for (size_t k = 0; k < S.live.size(); k++) {
+      o.u32(S.live[k]); o.u32(S.move[k]); o.u32(S.fed[k]);
+      o.f64(S.cos[k]); o.f64(S.sin[k]); o.f64(S.cosY[k]); o.f64(S.sinY[k]); o.f64(S.contest[k]); o.f64(S.wall[k]);
     }
     for (const Event& e : events) {
       o.u8(uint8_t(e.kind)); o.u16(uint16_t(e.tier)); o.u16(uint16_t(e.x)); o.u16(uint16_t(e.y)); o.u32(uint32_t(e.gen));

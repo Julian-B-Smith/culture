@@ -6,7 +6,7 @@ State lives here; conversations are ephemeral. Phase detail and rationale:
 
 ## Status
 
-- **Phase:** none in progress. Done 2026-10-02: P0, P1, PA0, P4. Next is the human's pick: P2 (needs the render-stack decision), P5 (unblocked; design basis in D-029) or PE1.
+- **Phase:** P3 — sound (current, D-033): listening first, then the audio-stack decision. Done 2026-10-02: P0, P1, PA0, P4. Also open: P2 (render stack), P5, PE1, PD1.
 - **Oracle (C++ canonical since D-030):**
   - **What the gates check:** pinned C++ goldens and deep goldens, run for
     both the optimized core and the frozen naive `core/ref`; vectors and trig
@@ -80,8 +80,11 @@ hold **and** a `traces/` entry is written.
   `reference/culture.html` at the same seed in instant mode shows the same
   world; 550×350 at 60 fps at 1×.
 
-### P3 — Sound
-- **Status:** blocked on P2
+### P3 — Sound ← current
+- **Status:** next (chosen 2026-10-03, D-033); first step is listening. The
+  dev viewer plays the frozen v0 engine fed by the C++ core, and the human
+  picks the stack by ear. No longer blocked on P2: the engine only reads
+  snapshots, so it can be built and offline-rendered before any viewer.
 - **Blocking open questions:** audio stack; whether Reverb Station's FDN
   replaces the convolution reverb (that would mean an intake brief).
 - **Acceptance:** PORT_PLAN P3 — 10-minute run at 10 voices with no clicks or

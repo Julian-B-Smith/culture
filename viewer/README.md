@@ -6,7 +6,13 @@ page. It shows exactly what libculture does, current DECISIONS included. The
 frozen v0 prototype (`reference/culture.html`) shows the old JS semantics.
 
 **This is a dev tool, not the P2 viewer.** P2's render and audio stacks are
-still the human's decision (ROADMAP P2). No sound here.
+still the human's decision (ROADMAP P2).
+
+**Sound** (button; browsers only start audio from a click): the frozen v0
+engine, `reference/sound.js`, served unmodified and fed by the C++ core
+through an adapter in `index.html` (D-033). It is a listening reference for
+P3, not P3: Web Audio, unseeded reverb impulse and noise, no reproducible
+render. Pause suspends it too.
 
 ## Run
 
@@ -55,6 +61,6 @@ births.
 - `stream.cpp`: the frame writer (format documented at the top). It reads
   the clock to pace frames, which is allowed: it is an adapter, and the core
   never sees the time.
-- `server.js`: serves the page, spawns one `culture_stream` per viewer with
+- `server.js`: serves the page and `/sound.js` (the frozen engine), spawns one `culture_stream` per viewer with
   whitelisted arguments (no shell), and POST `/control` pauses or resumes it.
 - `index.html`: parsing, drawing, ledger, event log.
