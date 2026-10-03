@@ -37,6 +37,9 @@ entry of `.claude/launch.json`.
   Where a host refuses real full screen or never completes the request (seen
   in the Claude browser pane), an in-page mode fills the window instead.
 - **Space** pauses and resumes.
+- The side panel stays put: the tier list and the event log each scroll in
+  their own box, so a long run with dozens of tiers never pushes the controls
+  out of sight. The tier box keeps its scroll position as it updates.
 - The world always scales to fill the space it has (fractional zoom, crisp
   pixels). Integer-only zoom had left a 550×350 world at 1× on a laptop.
 - **Pause** stops the simulation process itself (the server sends SIGSTOP), so
