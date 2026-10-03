@@ -12,6 +12,9 @@ const { spawn } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const BIN = path.join(ROOT, 'build', 'culture_stream');
 const PAGE = path.join(__dirname, 'index.html');
+// The frozen v0 sound engine, served unmodified (D-030 freezes reference/;
+// the viewer adapts the C++ stream to it instead of editing it).
+const SOUND = path.join(ROOT, 'reference', 'sound.js');
 const PORT = Number(process.env.PORT) || 5180;
 
 // Only whitelisted, range-checked values ever reach the child's argv; it is
@@ -25,8 +28,8 @@ function streamArgs(q) {
   const size = sizes.includes(q.get('size')) ? q.get('size') : '220x140';
   const profile = q.get('profile') === 'stress' ? 'stress' : 'default';
   return ['--size', size, '--seed', String(int('seed', 0, 4294967295, 1)), '--profile', profile,
-    '--spf', String(int('spf', 1, 64, 1)), '--fps', String(int('fps', 1, 60, 30)),
-    '--slice', String(int('slice', 0, 800, 8))];
+    '--spf', String(int('spf', 1, 64, 1)), '--fps', String(int('fps', 1, 60, 60)),
+    '--slice', String(int('slice', 0, 800, 2))];
 }
 
 // Live streams by id, so /control can pause one. Pausing must stop the
@@ -41,6 +44,11 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/' || url.pathname === '/index.html') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     fs.createReadStream(PAGE).pipe(res);
+    return;
+  }
+  if (url.pathname === '/sound.js') {
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+    fs.createReadStream(SOUND).pipe(res);
     return;
   }
   if (url.pathname === '/stream') {
