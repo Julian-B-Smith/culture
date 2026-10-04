@@ -47,5 +47,5 @@ Ask the user these. They are not decided.
 
 - AI interprets and proposes; deterministic code decides. Seeded RNG, reproducible outputs, no wall-clock time in the core.
 - Every phase has a `./verify` gate, and gates are never weakened. The golden traces are the oracle, and they change only through a recorded decision.
-- `DECISIONS.md` is append-only. Seed it from this packet's log (D-001 to D-019).
+- `DECISIONS.md` is append-only. Seed it from this packet's log (D-001 to D-019, then prototype decisions imported as P-020 to P-035; see DECISIONS.md).
 - Do not reintroduce stacked lattice layers (D-006) without a new reason from the user.

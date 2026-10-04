@@ -1,0 +1,1985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Culture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&family=VT323&display=swap">
+<style>
+/* Layout: lab instrument — the world fills the left, a lineage ledger and controls sit in a narrow right column; stacks on phones. Single deliberate dark look. */
+:root {
+  color-scheme: dark;
+  --ground: #0d0f17;
+  --panel: #151826;
+  --line: #262a3d;
+  --ink: #e6e4ef;
+  --muted: #8d8aa3;
+  --signal: #f2b84b;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--ground); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.wrap { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; padding: 20px 20px; max-width: 1500px; margin: 0 auto; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); padding: 16px 16px; } }
+.stage { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.titlebar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 34px; letter-spacing: -0.02em; margin: 0; line-height: 1; }
+.readout { font-family: var(--font-data); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 500; }
+.canvas-box { position: relative; width: 100%; aspect-ratio: 220 / 140; max-width: 100%; margin-inline: auto; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: #000; }
+.canvas-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+[hidden] { display: none !important; }
+.theater { position: relative; }
+.hud { display: none; }
+.theater:fullscreen, .theater.on { position: fixed; inset: 0; z-index: 50; background: #000; display: flex; align-items: center; justify-content: center; }
+.theater:fullscreen, .theater.on { overflow: hidden; touch-action: manipulation; height: 100dvh; width: 100dvw; }
+.theater:fullscreen .hud, .theater.on .hud {
+  display: flex; position: absolute; left: 0; right: 0; bottom: 0; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, rgba(5, 6, 10, 0.85)); transition: opacity 0.4s;
+}
+.theater.idle .hud { opacity: 0; pointer-events: none; }
+.theater.osd .hud { visibility: hidden; }
+/* Camcorder-style recording tally. Page overlay only: never appears in the recorded video. */
+.recdot { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 12px; z-index: 3; display: flex; align-items: center; gap: 6px;
+  font: 500 13px var(--font-data); color: #fff; background: rgba(0,0,0,0.45); padding: 3px 8px; border-radius: 3px; pointer-events: none; }
+.recdot .dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3b4e; animation: tally 1s steps(2, start) infinite; }
+@keyframes tally { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .recdot .dot { animation: none; } }
+.theater.idle { cursor: none; }
+.hud-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hud-size { display: inline-flex; gap: 4px; align-items: center; }
+.hud button:disabled { opacity: 0.4; }
+.hud button { padding: 5px 10px; font-size: 12px; background: rgba(30, 34, 54, 0.85); }
+.hud #hsound[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.side { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 500; }
+.btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+button { font: 500 13px var(--font-body); color: var(--ink); background: #1e2236; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; cursor: pointer; }
+button:hover { background: #262b44; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+button.primary { background: var(--signal); color: #1a1405; border-color: var(--signal); }
+button.sound { grid-column: 1 / -1; }
+button.sound[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
+button.primary:hover { background: #f6c86d; }
+.meter { position: relative; height: 10px; background: #0b0d14; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.meter .fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #4a4f7a, var(--signal)); width: 0; }
+.meter .mark { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--ink); }
+.meter-row { display: flex; justify-content: space-between; font-family: var(--font-data); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; }
+.ctl label { font-size: 13px; }
+.ctl output { font-family: var(--font-data); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ctl input { grid-column: 1 / -1; width: 100%; accent-color: var(--signal); }
+.ctl .hint { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.ledger { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+.tier { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding-block: 6px; border-top: 1px solid var(--line); }
+.tier:first-child { border-top: 0; }
+.sw { width: 12px; height: 12px; border-radius: 2px; }
+.tier .name { font-family: var(--font-display); font-weight: 500; font-size: 15px; }
+.tier .rule { font-family: var(--font-data); font-size: 12px; }
+.tier .meta { grid-column: 2 / -1; font-family: var(--font-data); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tier .reacts { color: var(--muted); }
+.elx { font-weight: 500; }
+.ctl button { justify-self: end; padding: 3px 10px; font-size: 12px; }
+.tier .cov { grid-column: 2 / -1; height: 3px; background: #0b0d14; border-radius: 2px; overflow: hidden; }
+.tier .cov div { height: 100%; }
+.tier.extinct .name, .tier.extinct .rule { color: var(--muted); text-decoration: line-through; }
+.views { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.views button { padding: 4px 10px; font-size: 12px; }
+.views #markers[aria-pressed="false"] { color: var(--muted); }
+.views #crt[aria-pressed="false"] { color: var(--muted); }
+.views #crt[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
+.hud #hcrt[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
+.canvas-box canvas#crtview { image-rendering: auto; }
+.seg { display: inline-flex; justify-self: end; }
+.seg button { padding: 3px 10px; font-size: 12px; border-radius: 0; }
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; border-left: 0; }
+.seg button[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
+#buffer[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
+#rec.live, #hrec.live { background: #7a1f2b; border-color: #e0566a; color: #fff; }
+.rec-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.clipwrap { display: flex; flex-direction: column; gap: 8px; }
+.clipwrap video { width: 100%; max-width: 100%; border-radius: 4px; background: #000; }
+.views button.on { border-color: var(--signal); color: var(--signal); }
+.views .hint { font-size: 12px; color: var(--muted); }
+.tier.dying .name::after { content: "retreating"; margin-left: 8px; font: 500 10px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tier.frontier .name::after { content: "frontier"; margin-left: 8px; font: 500 10px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--signal); }
+details summary { cursor: pointer; font-weight: 500; }
+details p, details li { color: var(--muted); }
+details ol { padding-left: 18px; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <main class="stage">
+    <div class="titlebar">
+      <h1>Culture</h1>
+      <div class="readout">gen <b id="gen">0</b> · frontier tier <b id="ftier">0</b> · age <b id="fage">0</b> · active <b id="factive">1</b> · extinctions <b id="fext">0</b></div>
+    </div>
+    <div id="theater" class="theater">
+      <div class="canvas-box">
+        <canvas id="world" width="220" height="140" aria-label="Cellular automaton world"></canvas>
+        <canvas id="crtview" hidden aria-hidden="true"></canvas>
+        <canvas id="fx" width="1100" height="700" aria-hidden="true"></canvas>
+      </div>
+      <div class="recdot" id="recdot" hidden aria-live="polite"><span class="dot"></span>REC <span id="rectime">0:00</span></div>
+      <div class="hud" id="hud">
+        <span class="readout">gen <b id="hgen">0</b> · tier <b id="htier">0</b></span>
+        <span class="hud-btns">
+          <button id="hslower" aria-label="Slower">−</button>
+          <span class="readout" id="hspeed">3×</span>
+          <button id="hfaster" aria-label="Faster">+</button>
+          <button id="hrun">Pause</button>
+          <button id="hsound" aria-pressed="false">Sound on</button>
+          <span class="hud-size" role="group" aria-label="World size">
+            <button id="hsizedown" aria-label="Smaller world">◂</button>
+            <span class="readout" id="hsizeo">330×210</span>
+            <button id="hsizeup" aria-label="Larger world">▸</button>
+          </span>
+          <button id="hforce" aria-label="Force emergence">Emerge</button>
+          <button id="hreset">New world</button>
+          <button id="hrec">● Rec</button>
+          <button id="hcrt" aria-pressed="false">CRT</button>
+          <button id="hfill" aria-label="Fill the screen">Fill</button>
+          <button id="hexit">Exit full screen</button>
+        </span>
+      </div>
+    </div>
+    <div class="views" role="group" aria-label="View">
+      <button id="vlife" class="on" aria-pressed="true">Life</button>
+      <button id="vmem" aria-pressed="false">Memory</button>
+      <button id="markers" aria-pressed="false">Markers</button>
+      <button id="crt" aria-pressed="false">CRT</button>
+      <button id="mask" hidden title="Phosphor layout: Trinitron stripes, TV slots or monitor dots">Mask: Slot</button>
+      <button id="full">Full screen</button>
+      <span class="hint" id="vhint">Bright cells are alive. The tint shows which tier's rule governs each site.</span>
+    </div>
+    <p class="lede">Each site obeys the rule of the tier it belongs to. Tier 0 is Conway's Life. When the frontier tier produces a neighborhood more improbable than anything in its history, a new rule is derived from that configuration and spreads outward. Ground changes hands only under sustained contact, and contested ground hardens. Sites also remember harm: a site that lost a cell to a particular crowding count resists that count for a while. Every ruleset belongs to a color family with its own reactions: it may push back a color, holding its ground and pressing into it even when that color is newer; it may feed on a color, coming alive more easily beside it; or it may spark with a color, so a new ruleset can be born where the two touch. The longer one ruleset dominates, the likelier it mutates within its own color. The world wraps around at the edges, top to bottom and side to side.</p>
+    <p class="lede">With sound on, the box is the sound field: a colony on the left of the box sounds on the left, one near the top sounds distant, and a tier spread across the whole box sounds wide. Keys: F full screen, space pause, E force emergence, R start or stop recording, S sound on or off (E, R and S don't bring up the controls). With CRT on in full screen, M opens the menu. On a phone held upright, full screen turns the world sideways to use the whole height; tap to bring the controls back.</p>
+  </main>
+  <aside class="side">
+    <section class="card">
+      <div class="btns">
+        <button id="run" class="primary">Pause</button>
+        <button id="step">Step</button>
+        <button id="force">Force emergence</button>
+        <button id="reset">New world</button>
+        <button id="sound" class="sound" aria-pressed="false">Sound on</button>
+      </div>
+      <div class="ctl"><label for="volume">Volume</label><output id="volumeo"></output><input id="volume" type="range" min="0" max="100" value="70"></div>
+      <div class="label">Surprise at the frontier</div>
+      <div class="meter" aria-hidden="true"><div class="fill" id="mfill"></div><div class="mark" id="mmark"></div></div>
+      <div class="meter-row"><span>now <span id="snow">0</span> bits</span><span>threshold <span id="sthr">0</span></span></div>
+      <div class="label">Quiet since last birth</div>
+      <div class="meter" aria-hidden="true"><div class="fill" id="qfill"></div><div class="mark" style="left:50%"></div></div>
+      <div class="meter-row"><span><span id="quiet">0</span> gen</span><span>typical epoch <span id="typical">0</span></span></div>
+      <div class="label">Reign of the dominant tier</div>
+      <div class="meter" aria-hidden="true"><div class="fill" id="rfill"></div><div class="mark" style="left:50%"></div></div>
+      <div class="meter-row"><span><b id="rname">Tier 0</b> has led <span id="reign">0</span> gen</span><span>mark = typical epoch</span></div>
+    </section>
+    <section class="card">
+      <div class="label">Capture</div>
+      <div class="btns">
+        <button id="buffer" aria-pressed="false">Keep last 15 s</button>
+        <button id="rec">Record</button>
+      </div>
+      <p class="hint rec-hint" id="rechint" aria-live="polite"></p>
+      <div id="clipwrap" class="clipwrap" hidden>
+        <video id="clip" controls playsinline></video>
+        <button id="clipclose">Close clip</button>
+      </div>
+    </section>
+    <section class="card">
+      <div class="label">Lineage</div>
+      <div class="ledger" id="ledger"></div>
+    </section>
+    <section class="card">
+      <div class="label">World</div>
+      <div class="ctl"><span>Shape</span><span class="seg" role="group" aria-label="Shape"><button id="shapeWide" aria-pressed="true">Wide</button><button id="shapeSquare" aria-pressed="false">Square</button></span><span class="hint">Changing shape starts a new world. Square suits social posts.</span></div>
+      <div class="ctl"><label for="size">Size</label><output id="sizeo"></output><input id="size" type="range" min="0" max="4" value="2"><span class="hint">Releasing the slider starts a new world. Larger worlds cost more per step, so very large worlds slow down at high speeds.</span></div>
+      <div class="label">Emergence</div>
+      <div class="ctl"><label for="crowding">Crowding brake</label><output id="crowdingo"></output><input id="crowding" type="range" min="0" max="100" value="50"><span class="hint">When more than two tiers each hold at least 1% of the world, new births of every kind slow down, so a complex world has time to play out.</span></div>
+      <div class="ctl"><label for="speed">Speed</label><output id="speedo"></output><input id="speed" type="range" min="0" max="9" value="2"></div>
+      <div class="ctl"><label for="margin">Rarity margin</label><output id="margino"></output><input id="margin" type="range" min="1" max="15" value="4"><span class="hint">How far a configuration must exceed the tier's surprise record.</span></div>
+      <div class="ctl"><label for="patience">Record half-life</label><output id="patienceo"></output><input id="patience" type="range" min="2.5" max="4.5" step="0.1" value="3.4"><span class="hint">How slowly the world forgets its most surprising moment.</span></div>
+      <div class="ctl"><label for="maxSpeed">Max invasion speed</label><output id="maxSpeedo"></output><input id="maxSpeed" type="range" min="5" max="100" value="30"><span class="hint">New rules whose growth outruns this, in cells per generation, are rejected. Conway's gliders travel at 0.25.</span></div>
+    </section>
+    <section class="card">
+      <div class="label">Color reactions</div>
+      <div class="ctl"><label for="reactions">Reactions between color families</label><button id="reactions" aria-pressed="true">On</button><span class="hint">Each ruleset belongs to a color family and may push back, feed on, or spark with other families.</span></div>
+      <div class="ctl"><label for="mutation">Mutation pressure</label><output id="mutationo"></output><input id="mutation" type="range" min="0" max="30" value="10"><span class="hint">The longer the dominant tier keeps its lead, the likelier it throws off a mutant of its own color. The chance grows with the square of its reign and with how much ground it holds.</span></div>
+      <div class="ctl"><label for="spark">Spark rate</label><output id="sparko"></output><input id="spark" type="range" min="0" max="50" value="10"><span class="hint">Chance that a living contact between sparking colors births a new ruleset at their border. Each pair rests 1,500 generations after a birth.</span></div>
+    </section>
+    <section class="card">
+      <div class="label">Borders and memory</div>
+      <div class="ctl"><label for="hold">Contact needed to claim</label><output id="holdo"></output><input id="hold" type="range" min="1" max="12" value="4"><span class="hint">Pressure a higher tier must build against a site before it converts.</span></div>
+      <div class="ctl"><label for="hardness">Border hardening</label><output id="hardnesso"></output><input id="hardness" type="range" min="0" max="8" value="3"><span class="hint">How much harder held ground can become to take.</span></div>
+      <div class="ctl"><label for="gain">Resistance gained per harm</label><output id="gaino"></output><input id="gain" type="range" min="0" max="60" value="25"><span class="hint">Each time a site suffers the same harm, it becomes more likely to resist it next time.</span></div>
+      <div class="ctl"><label for="forget">Memory of harm</label><output id="forgeto"></output><input id="forget" type="range" min="1" max="2.7" step="0.1" value="1.8"><span class="hint">Half-life of acquired resistance and border hardening.</span></div>
+      <div class="ctl"><label for="noise">Background noise</label><output id="noiseo"></output><input id="noise" type="range" min="0" max="20" value="3"></div>
+      <div class="ctl"><label for="memory">Statistics memory</label><output id="memoryo"></output><input id="memory" type="range" min="1.5" max="3.5" step="0.1" value="2.1"><span class="hint">Half-life of the pattern frequencies that define "rare".</span></div>
+    </section>
+    <section class="card">
+      <details>
+        <summary>How the sound works</summary>
+        <ol>
+          <li>Every ruleset is a voice. Its rule is its spectrum: surviving on n neighbors sounds harmonic n+1, and being born on n neighbors adds a quieter upper band. A mutant's spectrum differs from its parent's by one or two partials.</li>
+          <li>Pitch walks through just intonation. A new tier steps from the tier it came from by an interval chosen from its hash. Mutants sit a few cents from their parent and glide out of its pitch. Sparked tiers take the product of their parents' ratios and glide out of their midpoint.</li>
+          <li>Color family sets spectral tilt and filter resonance. Territory sets loudness, life within it sets sustain, motion and feeding open the filter, and the position of living cells sets the stereo field.</li>
+          <li>Contested borders pull each voice's two oscillators apart, so conflict beats. Hardened ground feeds a comb tuned to the voice, so entrenched frontiers ring.</li>
+          <li>A noise riser climbs as frontier surprise approaches the threshold. A retreating tier sinks an octave as it gives ground back. When the world stays quiet past its typical epoch, the drone thins and the reverb grows.</li>
+        </ol>
+      </details>
+    </section>
+    <section class="card">
+      <details>
+        <summary>How emergence works</summary>
+        <ol>
+          <li>Every living cell in the frontier tier reads its 3×3 neighborhood as one of 512 codes. A decaying frequency table gives each code a surprise in bits.</li>
+          <li>Surprise is summed over 5×5 windows. The record is set during a warm-up period and then slowly erodes. When the largest window beats it by the rarity margin, emergence fires.</li>
+          <li>The triggering 7×7 configuration is hashed into a seed, and a dashed ring marks the site while the search runs in the background. Candidate rules are drawn from that seed and kept only if they never appeared before, grow slower than the invasion limit, and stay active without exploding or freezing.</li>
+          <li>The new tier claims a disc at the trigger site. Its living cells press on lower-tier neighbors; a site converts once pressure exceeds its threshold, which rises wherever ground has been held under pressure.</li>
+          <li>When a cell dies from a crowding count its site has died from before, the site's resistance to that count grows. Resistance fades with time, so the world remembers recent harm, not all harm.</li>
+          <li>Color reactions are drawn from the same seed as the rule. Pushing back cancels the newer tier's pressure and lets the older one take ground. Feeding lets a site accept one more neighbor at birth and one more or fewer at survival. Sparking births a new ruleset at a living contact, with a double ring marking the spot.</li>
+          <li>The typical epoch is a running average of the gaps between births. Mutation chance per generation is proportional to the dominant tier's share of the world times the square of its reign measured in typical epochs. A reign of one epoch is mildly restless; three epochs is nine times more so. Mutations keep coming until the reign ends. A mutant flips one or two neighbor counts of the dominant rule, keeps its color, sometimes shifts one reaction, and is marked with a dotted ring.</li>
+          <li>The crowding brake counts tiers holding at least 1% of the world. For each one beyond two, the pause after a birth gets longer, the surprise threshold rises, and spark and mutation chances shrink. In tests at 100%, births in crowded stretches came at a bit under half the unbraked rate.</li>
+          <li>A frontier that dies out or freezes for 200 generations goes extinct. Its rule is retired for good, and its ground returns to its parent in the reverse order it was taken. Emergence pauses until the retreat finishes.</li>
+        </ol>
+      </details>
+    </section>
+  </aside>
+</div>
+<script>
+const Core = (() => {
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hash32(vals) {
+    let h = 2166136261 >>> 0;
+    for (const v of vals) for (let k = 0; k < 4; k++) { h ^= (v >>> (k * 8)) & 255; h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  }
+  function ruleStr(r) {
+    let b = '', s = '';
+    for (let n = 0; n < 9; n++) { if ((r.born >> n) & 1) b += n; if ((r.survive >> n) & 1) s += n; }
+    return 'B' + b + '/S' + s;
+  }
+  const CONWAY = { born: 1 << 3, survive: (1 << 2) | (1 << 3) };
+
+  // Edge-of-chaos screen, measured late so rules that coagulate after a lively start are rejected.
+  function screen(rule, rng) {
+    const N = 48;
+    let a = new Uint8Array(N * N), b = new Uint8Array(N * N), act = 0;
+    for (let i = 0; i < N * N; i++) a[i] = rng() < 0.35 ? 1 : 0;
+    for (let t = 0; t < 280; t++) {
+      let changed = 0;
+      for (let y = 0; y < N; y++) {
+        const ym = ((y + N - 1) % N) * N, y0 = y * N, yp = ((y + 1) % N) * N;
+        for (let x = 0; x < N; x++) {
+          const xm = (x + N - 1) % N, xp = (x + 1) % N;
+          const n = a[ym + xm] + a[ym + x] + a[ym + xp] + a[y0 + xm] + a[y0 + xp] + a[yp + xm] + a[yp + x] + a[yp + xp];
+          const al = a[y0 + x], nx = al ? (rule.survive >> n) & 1 : (rule.born >> n) & 1;
+          b[y0 + x] = nx; if (nx !== al) changed++;
+        }
+      }
+      const tmp = a; a = b; b = tmp;
+      if (t >= 250) act += changed;
+      if (t === 80 && (changed === 0 || changed > 0.4 * N * N)) return { density: 0, activity: 0, ok: false };
+    }
+    let sum = 0; for (let i = 0; i < N * N; i++) sum += a[i];
+    const density = sum / (N * N), activity = act / (30 * N * N);
+    return { density, activity, ok: density > 0.04 && density < 0.5 && activity > 0.01 && activity < 0.2 };
+  }
+
+  // Invasion speed: grow a small patch in empty space and measure how fast its edge travels,
+  // in cells per generation. 1.0 is the lattice's speed of light; Conway's gliders move at 0.25.
+  function growth(rule, rng, limit) {
+    const N = 96, c0 = N / 2, T = 60;
+    let a = new Uint8Array(N * N), b = new Uint8Array(N * N);
+    for (let y = -3; y < 3; y++) for (let x = -3; x < 3; x++) a[(c0 + y) * N + c0 + x] = rng() < 0.45 ? 1 : 0;
+    for (let t = 0; t < T; t++) {
+      if (t % 10 === 9 && limit !== undefined) {
+        let r = 0;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (a[y * N + x]) { const d = Math.max(Math.abs(x - c0), Math.abs(y - c0)); if (d > r) r = d; }
+        if (r - 3 > limit * T + 2) return 1;
+      }
+      for (let y = 1; y < N - 1; y++) {
+        const ym = (y - 1) * N, y0 = y * N, yp = (y + 1) * N;
+        for (let x = 1; x < N - 1; x++) {
+          const n = a[ym + x - 1] + a[ym + x] + a[ym + x + 1] + a[y0 + x - 1] + a[y0 + x + 1] + a[yp + x - 1] + a[yp + x] + a[yp + x + 1];
+          b[y0 + x] = a[y0 + x] ? (rule.survive >> n) & 1 : (rule.born >> n) & 1;
+        }
+      }
+      const tmp = a; a = b; b = tmp;
+    }
+    let r = 0;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (a[y * N + x]) r = Math.max(r, Math.abs(x - c0), Math.abs(y - c0));
+    return Math.max(0, r - 3) / T;
+  }
+
+  // Every ruleset belongs to one of six color families and carries innate reactions to the others.
+  // Reactions are keyed to colors, not to particular tiers, so a newcomer can trigger reactions
+  // that older tiers have carried all along.
+  const ELEMENTS = ['ash', 'ember', 'gold', 'moss', 'tide', 'violet'];
+  const NONE = 0, PUSH = 1, FEED = 2, SPARK = 3;
+  function genome(rng, el) {
+    const react = new Uint8Array(ELEMENTS.length);
+    for (let e = 0; e < ELEMENTS.length; e++) {
+      if (e === el) continue;
+      const u = rng();
+      react[e] = u < 0.5 ? NONE : u < 0.68 ? PUSH : u < 0.88 ? FEED : SPARK;
+    }
+    return { el, react };
+  }
+
+  class World {
+    constructor(W, H, seed) {
+      this.W = W; this.H = H; this.seed = seed >>> 0;
+      this.rng = mulberry32(this.seed);
+      const n = W * H;
+      this.alive = new Uint8Array(n); this.next = new Uint8Array(n);
+      this.tier = new Uint16Array(n);
+      this.pressure = new Float32Array(n); // contact from a higher tier, accumulating and leaking
+      this.wall = new Float32Array(n);     // hardening of contested ground against conversion
+      this.harm = new Uint8Array(n);       // neighbor count (+1) that last killed a cell at this site
+      this.resist = new Float32Array(n);   // acquired resistance to that count
+      this.claimed = new Int32Array(n);
+      this.sparkLast = new Map();          // last generation each pair of tiers sparked a birth
+      this.lastBirth = 0; this.meanEpoch = 600; this.reignTier = null; this.reignStart = 0; this.active = 1; this.brake = 1; this.thresholdLift = 1; // births so far set the world's sense of a normal epoch length
+      this.retreat = null;
+      this.score = new Float32Array(n);
+      this.integral = new Float64Array((W + 1) * (H + 1));
+      this.tiers = [Object.assign({ idx: 0, rule: CONWAY, gen: 0, origin: null, surprise: 0, tries: 0, cells: n, speed: 0.25 }, genome(this.rng, 0))];
+      this.usedRules = new Set([ruleStr(CONWAY)]);
+      this.extinct = [];
+      this.gen = 0; this.lastMax = 0; this.lastArg = -1;
+      this.resetFrontierStats();
+      for (let i = 0; i < n; i++) this.alive[i] = this.rng() < 0.3 ? 1 : 0;
+    }
+    get frontier() { return this.tiers.length - 1; }
+    resetFrontierStats() { this.table = new Float64Array(512); this.tableTotal = 0; this.record = 0; this.frontierAge = 0; this.starve = 0; }
+
+    step(p) {
+      const { W, H, rng, tiers } = this, n = W * H;
+      const nb = this.nb ??= new Int32Array(8); // neighbor indices, reused to avoid per-cell allocation
+      const a = this.alive, b = this.next, tier = this.tier, harm = this.harm, res = this.resist;
+      // 1. Each cell follows the rule of the tier its site belongs to.
+      //    Hysteresis: a site that recently lost a cell at some neighbor count can resist that count.
+      let motion = 0, frontierLive = 0;
+      const F = this.frontier, T = tiers.length, dying = this.retreat ? this.retreat.tier : -1;
+      const el = new Uint8Array(T), feedOn = new Uint8Array(T), bornFed = new Uint16Array(T), survFed = new Uint16Array(T);
+      const canPush = new Uint8Array(T * T), sparks = new Uint8Array(T * T);
+      for (let t = 0; t < T; t++) {
+        const X = tiers[t]; el[t] = X.el;
+        for (let e = 0; e < 6; e++) if (X.react[e] === FEED) feedOn[t] |= 1 << e;
+        // A fed site tolerates one more neighbor at birth and one either way at survival.
+        bornFed[t] = (X.rule.born | (X.rule.born << 1)) & 0x1FC;
+        survFed[t] = (X.rule.survive | (X.rule.survive << 1) | (X.rule.survive >> 1)) & 0x1FF;
+      }
+      for (let a2 = 0; a2 < T; a2++) for (let b2 = 0; b2 < T; b2++) {
+        if (a2 === b2) continue;
+        const A = tiers[a2], B = tiers[b2];
+        // Newer tiers press on older ones by default. A tier that pushes back against a color
+        // both holds its ground against it and presses into it, so the frontier can be beaten back.
+        const upward = a2 > b2 && !(p.reactions && B.react[A.el] === PUSH);
+        const back = p.reactions && A.react[B.el] === PUSH;
+        canPush[a2 * T + b2] = a2 !== dying && (upward || back) ? 1 : 0;
+        const key = Math.min(a2, b2) * 4096 + Math.max(a2, b2);
+        const ready = this.gen - (this.sparkLast.get(key) ?? -1e9) > p.sparkCooldown && this.frontierAge > (this.warm ?? p.warmup) / 2;
+        sparks[a2 * T + b2] = ready && p.reactions && (A.react[B.el] === SPARK || B.react[A.el] === SPARK) ? 1 : 0;
+      }
+      this.fedCount = new Uint32Array(T);
+      // Per-tier statistics the sound engine listens to.
+      const liveT = new Uint32Array(T), moveT = new Uint32Array(T), cosT = new Float64Array(T), sinT = new Float64Array(T);
+      const cosYT = new Float64Array(T), sinYT = new Float64Array(T);
+      const cosY = this.cosY ??= Float64Array.from({ length: H }, (_, y) => Math.cos(2 * Math.PI * y / H));
+      const sinY = this.sinY ??= Float64Array.from({ length: H }, (_, y) => Math.sin(2 * Math.PI * y / H));
+      const contestT = new Float64Array(T), wallT = new Float64Array(T);
+      const cosX = this.cosX ??= Float64Array.from({ length: W }, (_, x) => Math.cos(2 * Math.PI * x / W));
+      const sinX = this.sinX ??= Float64Array.from({ length: W }, (_, x) => Math.sin(2 * Math.PI * x / W));
+      for (let y = 0; y < H; y++) {
+        const ym = ((y + H - 1) % H) * W, y0 = y * W, yp = ((y + 1) % H) * W;
+        for (let x = 0; x < W; x++) {
+          const xm = (x + W - 1) % W, xp = (x + 1) % W;
+          const c = a[ym + xm] + a[ym + x] + a[ym + xp] + a[y0 + xm] + a[y0 + xp] + a[yp + xm] + a[yp + x] + a[yp + xp];
+          const i = y0 + x, ti = tier[i], r = tiers[ti].rule;
+          let nx;
+          const fm = p.reactions ? feedOn[ti] : 0;
+          let fed = false;
+          if (fm) {
+            nb[0] = ym + xm; nb[1] = ym + x; nb[2] = ym + xp; nb[3] = y0 + xm; nb[4] = y0 + xp; nb[5] = yp + xm; nb[6] = yp + x; nb[7] = yp + xp;
+            for (let k = 0; k < 8; k++) { const j = nb[k], tj = tier[j]; if (a[j] && tj !== ti && (fm >> el[tj]) & 1) { fed = true; break; } }
+          }
+          if (fed) { nx = a[i] ? (survFed[ti] >> c) & 1 : (bornFed[ti] >> c) & 1; this.fedCount[ti]++; }
+          else nx = a[i] ? (r.survive >> c) & 1 : (r.born >> c) & 1;
+          if (a[i] && !nx && p.gain > 0) {
+            const cat = c + 1;
+            if (harm[i] === cat && rng() < res[i]) nx = 1;
+            else { res[i] = harm[i] === cat ? Math.min(1, res[i] + p.gain) : p.gain; harm[i] = cat; }
+          }
+          res[i] *= p.forget;
+          b[i] = nx;
+          if (nx) { liveT[ti]++; cosT[ti] += cosX[x]; sinT[ti] += sinX[x]; cosYT[ti] += cosY[y]; sinYT[ti] += sinY[y]; }
+          if (nx !== a[i]) moveT[ti]++;
+          if (tier[i] === F) { frontierLive += nx; if (nx !== a[i]) motion++; }
+        }
+      }
+      const flips = Math.floor(p.noise * n + rng());
+      for (let k = 0; k < flips; k++) b[(rng() * n) | 0] = 1;
+      this.alive = b; this.next = a;
+      const al = this.alive;
+
+      // 2. Higher natures claim ground under sustained contact. Ground that has been
+      //    pressed and held hardens, so contested borders become stable and intermingled.
+      const pr = this.pressure, wall = this.wall, claims = [];
+      let sparkSite = -1, sparkPair = null;
+      for (let y = 0; y < H; y++) {
+        const ym = ((y + H - 1) % H) * W, y0 = y * W, yp = ((y + 1) % H) * W;
+        for (let x = 0; x < W; x++) {
+          const i = y0 + x, t = tier[i];
+          const xm = (x + W - 1) % W, xp = (x + 1) % W;
+          let push = 0, m = -1;
+          nb[0] = ym + xm; nb[1] = ym + x; nb[2] = ym + xp; nb[3] = y0 + xm; nb[4] = y0 + xp; nb[5] = yp + xm; nb[6] = yp + x; nb[7] = yp + xp;
+          for (let k = 0; k < 8; k++) {
+            const j = nb[k]; if (!al[j]) continue;
+            const tj = tier[j]; if (tj === t) continue;
+            if (canPush[tj * T + t]) { push++; if (tj > m) m = tj; }
+            if (al[i] && sparks[t * T + tj] && sparkSite < 0 && rng() < p.spark * this.brake) { sparkSite = i; sparkPair = [Math.min(t, tj), Math.max(t, tj)]; }
+          }
+          if (push === 0) {
+            if (pr[i] > 0) { pr[i] *= 0.8; if (pr[i] < 0.05) pr[i] = 0; }
+            wall[i] *= p.forget;
+            continue;
+          }
+          pr[i] = pr[i] * 0.8 + push;
+          contestT[t] += push; contestT[m] += push; wallT[t] += wall[i];
+          if (pr[i] >= p.hold * (1 + wall[i])) claims.push(i, m);
+          else wall[i] = Math.min(p.hardness, wall[i] + p.gain * 0.2);
+        }
+      }
+      for (let k = 0; k < claims.length; k += 2) {
+        const i = claims[k]; tier[i] = claims[k + 1]; pr[i] = 0; wall[i] = 0; harm[i] = 0; res[i] = 0; this.claimed[i] = this.gen;
+      }
+      // An extinct tier gives its ground back in the reverse order it took it.
+      let finished = null;
+      if (this.retreat) {
+        const rt = this.retreat; rt.t++;
+        const threshold = rt.from - (rt.from - rt.to + 1) * Math.min(1, rt.t / rt.dur);
+        for (let i = 0; i < n; i++) if (tier[i] === rt.tier && this.claimed[i] >= threshold) { tier[i] = rt.tier - 1; pr[i] = 0; wall[i] = 0; }
+        if (rt.t >= rt.dur) {
+          for (let i = 0; i < n; i++) if (tier[i] === rt.tier) tier[i] = rt.tier - 1;
+          const T = tiers.pop(); T.extinctAt = this.gen; T.dying = false; this.extinct.push(T);
+          this.retreat = null; this.resetFrontierStats();
+          finished = { extinct: T.idx, gen: this.gen };
+        }
+      }
+      const counts = new Uint32Array(tiers.length);
+      for (let i = 0; i < n; i++) counts[tier[i]]++;
+      // Crowding brake: the more tiers share the world, the slower new ones arrive, so a complex
+      // world has time to play out. Every tier holding at least 1% of the ground counts as active.
+      let active = 0;
+      for (let t = 0; t < tiers.length; t++) if (counts[t] >= n * 0.01 && !tiers[t].dying) active++;
+      const excess = Math.max(0, active - 2);
+      this.active = active;
+      this.brake = 1 / (1 + (p.crowding || 0) * 0.6 * Math.pow(excess, 1.5)); // scales spark and mutation chances
+      this.thresholdLift = 1 + (p.crowding || 0) * 0.05 * excess;          // raises the bar for surprise births
+      this.warm = p.warmup * (1 + (p.crowding || 0) * excess);             // and lengthens the pause after each birth
+      // Reign: how long the tier holding the most ground has held it.
+      let D = 0;
+      for (let t = 1; t < tiers.length; t++) if (counts[t] > counts[D]) D = t;
+      if (tiers[D] !== this.reignTier) { this.reignTier = tiers[D]; this.reignStart = this.gen; }
+      this.stats = { live: liveT, move: moveT, cos: cosT, sin: sinT, cosY: cosYT, sinY: sinYT, contest: contestT, wall: wallT, fed: this.fedCount };
+      for (let t = 0; t < tiers.length; t++) tiers[t].cells = counts[t];
+      if (this.retreat || finished) { this.gen++; this.lastMax = 0; this.lastArg = -1; return finished; }
+      // Two colors that spark with each other can birth a new ruleset at their border.
+      if (sparkSite >= 0 && !this.search) {
+        this.gen++;
+        this.sparkLast.set(sparkPair[0] * 4096 + sparkPair[1], this.gen);
+        return this.emerge(sparkSite, 0, p, sparkPair);
+      }
+      // Mutation pressure grows with the length of the dominant tier's reign, measured against the
+      // world's typical epoch and weighted by how much of the world it holds. A long, total reign
+      // makes mutation within its color nearly certain; a brief or contested lead barely registers.
+      if (!this.search && p.mutation > 0 && this.frontierAge > this.warm) {
+        const D = this.reignTier.idx, share = counts[D] / n;
+        const reign = (this.gen - this.reignStart) / this.meanEpoch;
+        if (D === tiers.indexOf(this.reignTier) && rng() < p.mutation * this.brake * share * reign * reign / this.meanEpoch) {
+          let site = -1;
+          for (let q = 0; q < 4000 && site < 0; q++) { const i = (rng() * n) | 0; if (tier[i] === D && al[i]) site = i; }
+          if (site >= 0) { this.gen++; return this.emerge(site, 0, p, null, D); }
+        }
+      }
+
+      // 3. Surprise at the frontier.
+      const tab = this.table, sc = this.score;
+      for (let k = 0; k < 512; k++) tab[k] *= p.memory;
+      this.tableTotal *= p.memory;
+      const codes = [];
+      for (let y = 0; y < H; y++) {
+        const ym = ((y + H - 1) % H) * W, y0 = y * W, yp = ((y + 1) % H) * W;
+        for (let x = 0; x < W; x++) {
+          const i = y0 + x;
+          if (!al[i] || tier[i] !== F) { sc[i] = 0; continue; }
+          const xm = (x + W - 1) % W, xp = (x + 1) % W;
+          codes.push(i, al[ym + xm] | al[ym + x] << 1 | al[ym + xp] << 2 | al[y0 + xm] << 3 | al[y0 + x] << 4 |
+            al[y0 + xp] << 5 | al[yp + xm] << 6 | al[yp + x] << 7 | al[yp + xp] << 8);
+        }
+      }
+      const denom = this.tableTotal + 512;
+      for (let k = 0; k < codes.length; k += 2) sc[codes[k]] = -Math.log2((tab[codes[k + 1]] + 1) / denom);
+      for (let k = 0; k < codes.length; k += 2) tab[codes[k + 1]] += 1;
+      this.tableTotal += codes.length / 2;
+      const I = this.integral, W1 = W + 1, R = 2;
+      for (let y = 0; y < H; y++) {
+        let row = 0;
+        for (let x = 0; x < W; x++) { row += sc[y * W + x]; I[(y + 1) * W1 + x + 1] = I[y * W1 + x + 1] + row; }
+      }
+      let best = 0, arg = -1;
+      for (let y = R; y < H - R; y++) for (let x = R; x < W - R; x++) {
+        const i = y * W + x;
+        if (tier[i] !== F) continue;
+        const s = I[(y + R + 1) * W1 + x + R + 1] - I[(y - R) * W1 + x + R + 1] - I[(y + R + 1) * W1 + x - R] + I[(y - R) * W1 + x - R];
+        if (s > best) { best = s; arg = i; }
+      }
+      this.lastMax = best; this.lastArg = arg;
+      this.frontierAge++; this.gen++;
+
+      // 4. A frontier that dies out or freezes solid goes extinct; its ground reverts to its parent.
+      this.starve = (frontierLive < 4 || motion < 3) ? this.starve + 1 : 0;
+      if (F > 0 && this.starve > p.extinction) {
+        let from = tiers[F].gen;
+        for (let i = 0; i < n; i++) if (tier[i] === F && this.claimed[i] > from) from = this.claimed[i];
+        tiers[F].dying = true;
+        // Retreat time scales with how much ground there is to give back.
+        this.retreat = { tier: F, from, to: tiers[F].gen, t: 0, dur: Math.max(30, Math.round(p.retreat * tiers[F].cells / n)) };
+        return { dying: F, gen: this.gen };
+      }
+      // 5. The record is set during warm-up, then only erodes, so even a stagnant world
+      //    eventually crosses it. A lively one crosses it sooner.
+      if (this.frontierAge <= this.warm) { if (best > this.record) this.record = best; return null; }
+      if (this.search) return null;
+      if (arg >= 0 && best > this.record * (1 + p.margin) * this.thresholdLift) return this.emerge(arg, best, p);
+      this.record *= p.patience;
+      return null;
+    }
+
+    // The next nature is derived from the configuration that triggered it. Finding a rule
+    // that passes screening can take hundreds of test runs, so the search is a job that
+    // work() advances a few candidates at a time while the world keeps running.
+    emerge(site, surprise, p, parents, mutateFrom) {
+      const { W, H } = this, cx = site % W, cy = (site / W) | 0, al = this.alive;
+      const bits = [this.seed, this.tiers.length, this.extinct.length, parents ? parents[0] * 977 + parents[1] + 1 : 0, mutateFrom === undefined ? 0 : mutateFrom + 7919];
+      for (let dy = -3; dy <= 3; dy++) {
+        let row = 0;
+        for (let dx = -3; dx <= 3; dx++) row = (row << 1) | al[((cy + dy + H) % H) * W + (cx + dx + W) % W];
+        bits.push(row);
+      }
+      const h = hash32(bits);
+      this.search = { cx, cy, surprise, h, rng: mulberry32(h), tries: 0, parent: this.frontier, parents: parents || null,
+        mutateFrom: mutateFrom === undefined ? null : mutateFrom };
+      return { searching: true, x: cx, y: cy, gen: this.gen, spark: !!parents };
+    }
+    // Advances the pending rule search by at most maxCandidates candidates. Count-based rather
+    // than time-based so the core never reads a clock: the same seed and the same call pattern
+    // always produce the same world.
+    work(p, maxCandidates) {
+      const S = this.search;
+      if (!S) return null;
+      if (S.parent !== this.frontier || this.retreat) { this.search = null; return null; }
+      const rng = S.rng;
+      let rule = null, stats = null, done = 0;
+      while (!rule && S.tries < 800 && done++ < maxCandidates) {
+        S.tries++;
+        let born = 0, survive = 0;
+        if (S.mutateFrom !== null) {
+          // A mutant differs from its parent's rule by one or two neighbor counts.
+          const pr0 = this.tiers[S.mutateFrom].rule; born = pr0.born; survive = pr0.survive;
+          const flips = rng() < 0.6 ? 1 : 2;
+          for (let f = 0; f < flips; f++) {
+            const bit = Math.floor(rng() * 16);
+            if (bit < 7) born ^= 1 << (bit + 2); else survive ^= 1 << (bit - 7);
+          }
+        } else {
+          for (let c = 2; c <= 8; c++) if (rng() < 0.28) born |= 1 << c;
+          for (let c = 0; c <= 8; c++) if (rng() < 0.4) survive |= 1 << c;
+        }
+        if (!born) continue;
+        const cand = { born, survive };
+        if (this.usedRules.has(ruleStr(cand))) continue;
+        const speed = growth(cand, rng, p.maxSpeed);
+        if (speed > p.maxSpeed) continue;
+        const st = screen(cand, rng);
+        if (st.ok) { rule = cand; stats = st; stats.speed = speed; }
+      }
+      if (!rule) {
+        if (S.tries >= 800) {
+          // No viable mutant: count the attempt as a birth for pacing, so pressure rebuilds instead of retrying every frame.
+          if (S.mutateFrom !== null) this.lastBirth = this.gen;
+          this.search = null; this.record *= 1.05;
+        }
+        return null;
+      }
+      this.search = null;
+      const { W, H } = this, { cx, cy } = S, tier = this.tier, al = this.alive;
+      this.usedRules.add(ruleStr(rule));
+      const idx = this.tiers.length;
+      const parentEls = S.parents ? S.parents.map(t => this.tiers[t].el) : [];
+      let elx = 1 + Math.floor(rng() * 5);
+      for (let k = 0; k < 6 && parentEls.includes(elx); k++) elx = 1 + Math.floor(rng() * 5);
+      let gnm;
+      if (S.mutateFrom !== null) {
+        // A mutant keeps its parent's color and reactions, with a chance of one reaction shifting.
+        const P = this.tiers[S.mutateFrom];
+        gnm = { el: P.el, react: P.react.slice() };
+        if (rng() < 0.35) { const e = Math.floor(rng() * 6); if (e !== P.el) gnm.react[e] = Math.floor(rng() * 4); }
+      } else gnm = genome(rng, elx);
+      this.tiers.push(Object.assign({ idx, rule, gen: this.gen, origin: [cx, cy], surprise: S.surprise, tries: S.tries, hash: S.h, speed: stats.speed, cells: 0,
+        parents: S.parents ? S.parents.slice() : null, mutatedFrom: S.mutateFrom, from: S.parent, quiet: this.gen - this.lastBirth,
+        reign: S.mutateFrom !== null ? this.gen - this.reignStart : 0 }, gnm));
+      this.meanEpoch = 0.7 * this.meanEpoch + 0.3 * Math.max(50, this.gen - this.lastBirth);
+      this.lastBirth = this.gen;
+      const rad = 6;
+      for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+        if (dx * dx + dy * dy > rad * rad) continue;
+        const i = ((cy + dy + H) % H) * W + (cx + dx + W) % W;
+        tier[i] = idx; this.harm[i] = 0; this.resist[i] = 0; this.wall[i] = 0; this.claimed[i] = this.gen;
+        if (rng() < 0.35) al[i] = 1;
+      }
+      this.resetFrontierStats();
+      return { tier: idx, gen: this.gen, x: cx, y: cy };
+    }
+    forceEmerge(p) { return !this.retreat && !this.search && this.lastArg >= 0 ? this.emerge(this.lastArg, this.lastMax, p) : null; }
+  }
+  return { World, ruleStr, screen, growth, mulberry32, ELEMENTS, NONE, PUSH, FEED, SPARK };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+</script>
+<script>
+// Ambient sonification. Each ruleset is a voice whose spectrum is its rule; contests beat,
+// hardened borders ring, emergence is foreshadowed by a riser, and quiet thins the drone.
+const Sonic = (() => {
+  // Just intervals a new tier can step by from its parent. Mutants stay within a few cents.
+  const STEPS = [3 / 2, 4 / 3, 5 / 4, 6 / 5, 5 / 3, 7 / 4, 7 / 6, 8 / 7, 9 / 8, 11 / 8, 9 / 7, 13 / 8];
+  const BASE = 65.41; // C2
+  // Color families shape the spectrum: rolloff exponent (lower = brighter) and filter resonance.
+  const FAMILY = [
+    { tilt: 1.3, q: 0.4 },  // ash
+    { tilt: 0.55, q: 1.6 }, // ember
+    { tilt: 0.8, q: 2.4 },  // gold
+    { tilt: 1.1, q: 0.8 },  // moss
+    { tilt: 1.5, q: 3.2 },  // tide
+    { tilt: 0.9, q: 5.0 },  // violet
+  ];
+  const fold = r => { while (r >= 4) r /= 2; while (r < 1) r *= 2; return r; };
+
+  class Engine {
+    constructor() {
+      this.ctx = null; this.voices = new Map(); this.ratios = new Map(); this.volume = 0.7;
+      // Phones share fewer, slower cores between the simulation and the audio thread, and an
+      // audio thread that misses its deadline clicks. On touch devices the engine runs lighter:
+      // fewer voices, a shorter reverb, and slower parameter updates.
+      let touch = false;
+      try { touch = matchMedia('(pointer: coarse)').matches; } catch (e) {}
+      this.light = touch;
+      this.maxVoices = touch ? 6 : 10;
+      this.updateEvery = touch ? 0.1 : 0.066;
+    }
+
+    start() {
+      if (this.ctx) { this.ctx.resume(); return; }
+      // 'playback' asks for larger audio buffers: more latency, which an ambient piece doesn't need,
+      // in exchange for far fewer dropouts when the device is busy.
+      const AC = window.AudioContext || window.webkitAudioContext;
+      let ctx;
+      try { ctx = new AC({ latencyHint: 'playback' }); } catch (e) { ctx = new AC(); }
+      this.ctx = ctx;
+      this.master = ctx.createGain(); this.master.gain.value = this.volume;
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 3; comp.knee.value = 12;
+      this.bus = ctx.createGain(); this.bus.gain.value = 1;       // drone level, thinned by quiet
+      this.dry = ctx.createGain(); this.dry.gain.value = 0.55;
+      this.wet = ctx.createGain(); this.wet.gain.value = 0.7;
+      this.verb = ctx.createConvolver(); this.verb.buffer = this.impulse(this.light ? 3.5 : 6.5);
+      this.bus.connect(this.dry); this.bus.connect(this.verb); this.verb.connect(this.wet);
+      // Distant voices (high in the box) also feed the room directly, so they sit further back.
+      this.farBus = ctx.createGain(); this.farBus.gain.value = 1; this.farBus.connect(this.verb);
+      this.dry.connect(comp); this.wet.connect(comp);
+      this.buildTape(comp);
+      this.master.connect(ctx.destination);
+      // Tension riser: filtered noise that rises as surprise nears the threshold.
+      const noise = ctx.createBufferSource(); noise.buffer = this.noiseBuffer(4); noise.loop = true;
+      this.riseFilter = ctx.createBiquadFilter(); this.riseFilter.type = 'bandpass'; this.riseFilter.Q.value = 6; this.riseFilter.frequency.value = 300;
+      this.riseGain = ctx.createGain(); this.riseGain.gain.value = 0;
+      noise.connect(this.riseFilter); this.riseFilter.connect(this.riseGain); this.riseGain.connect(this.bus);
+      noise.start();
+    }
+    // VCR tape path, crossfaded in when the CRT view is on. Linear-track VHS audio: band-limited
+    // (rolled off below ~60 Hz and above ~9 kHz) with a low head bump, soft tape saturation, wow and
+    // flutter from a pitch-modulating delay, slightly narrowed stereo, a bed of hiss and faint mains
+    // hum, and occasional dropouts that the picture shares.
+    buildTape(src) {
+      const ctx = this.ctx;
+      this.tapeDry = ctx.createGain(); this.tapeDry.gain.value = this.tapeOn ? 0 : 1;
+      this.tapeWet = ctx.createGain(); this.tapeWet.gain.value = this.tapeOn ? 1 : 0;
+      src.connect(this.tapeDry); this.tapeDry.connect(this.master);
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 55; hp.Q.value = 0.6;
+      const bump = ctx.createBiquadFilter(); bump.type = 'peaking'; bump.frequency.value = 95; bump.Q.value = 1.1; bump.gain.value = 2.5;
+      const sat = ctx.createWaveShaper(); sat.oversample = '2x';
+      const curve = new Float32Array(1024), drive = 1.8;
+      for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * drive) / Math.tanh(drive); }
+      sat.curve = curve;
+      // Wow (slow pitch sag), flutter (fast shimmer) and a slower drift, all moving one short delay.
+      const delay = ctx.createDelay(0.05); delay.delayTime.value = 0.008;
+      for (const [f, depth] of [[0.55, 0.0011], [7.3, 0.00009], [0.13, 0.0007]]) {
+        const o = ctx.createOscillator(); o.frequency.value = f;
+        const g = ctx.createGain(); g.gain.value = depth;
+        o.connect(g); g.connect(delay.delayTime); o.start();
+      }
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000; lp.Q.value = 0.55;
+      const lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 11000; lp2.Q.value = 0.5;
+      // Narrow the stereo image: blend each side with a little of the other.
+      const split = ctx.createChannelSplitter(2), merge = ctx.createChannelMerger(2);
+      const ll = ctx.createGain(), rr = ctx.createGain(), lr = ctx.createGain(), rl = ctx.createGain();
+      ll.gain.value = rr.gain.value = 0.82; lr.gain.value = rl.gain.value = 0.18;
+      this.dropGain = ctx.createGain(); this.dropGain.gain.value = 1;
+      src.connect(hp); hp.connect(bump); bump.connect(sat); sat.connect(delay); delay.connect(lp); lp.connect(lp2); lp2.connect(split);
+      split.connect(ll, 0); split.connect(lr, 0); split.connect(rr, 1); split.connect(rl, 1);
+      ll.connect(merge, 0, 0); rl.connect(merge, 0, 0); rr.connect(merge, 0, 1); lr.connect(merge, 0, 1);
+      merge.connect(this.dropGain); this.dropGain.connect(this.tapeWet); this.tapeWet.connect(this.master);
+      // Hiss: noise shaped toward the upper mids; hum: 60 Hz and its third harmonic, barely there.
+      const hiss = ctx.createBufferSource(); hiss.buffer = this.noiseBuffer(3); hiss.loop = true;
+      const hh = ctx.createBiquadFilter(); hh.type = 'highpass'; hh.frequency.value = 1800;
+      const hl = ctx.createBiquadFilter(); hl.type = 'lowpass'; hl.frequency.value = 8500;
+      const hg = ctx.createGain(); hg.gain.value = 0.0045;
+      hiss.connect(hh); hh.connect(hl); hl.connect(hg); hg.connect(this.dropGain); hiss.start();
+      for (const [f, a] of [[60, 0.0012], [180, 0.0005]]) {
+        const o = ctx.createOscillator(); o.frequency.value = f;
+        const g = ctx.createGain(); g.gain.value = a; o.connect(g); g.connect(this.tapeWet); o.start();
+      }
+    }
+    setTape(on) {
+      this.tapeOn = on;
+      if (!this.ctx || !this.tapeWet) return;
+      const now = this.ctx.currentTime;
+      this.tapeWet.gain.setTargetAtTime(on ? 1 : 0, now, 0.15);
+      this.tapeDry.gain.setTargetAtTime(on ? 0 : 1, now, 0.15);
+    }
+    // A brief loss of signal from the tape: a fast dip and a slightly slower recovery.
+    dropout(seconds) {
+      if (!this.ctx || !this.dropGain || !this.tapeOn) return;
+      const g = this.dropGain.gain, now = this.ctx.currentTime;
+      if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now); else g.cancelScheduledValues(now);
+      g.setTargetAtTime(0.12, now, 0.006);
+      g.setTargetAtTime(1, now + seconds, 0.03);
+    }
+    stop() { if (this.ctx) this.ctx.suspend(); }
+    get running() { return this.ctx && this.ctx.state === 'running'; }
+    // A copy of the final mix for the recorder; null until sound has been switched on.
+    recordStream() {
+      if (!this.ctx || !this.ctx.createMediaStreamDestination) return null;
+      if (!this.recDest) { this.recDest = this.ctx.createMediaStreamDestination(); this.master.connect(this.recDest); }
+      return this.recDest.stream;
+    }
+    setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1); }
+
+    impulse(seconds) {
+      const ctx = this.ctx, len = Math.floor(seconds * ctx.sampleRate), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++) { const t = i / len; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * (t < 0.01 ? t / 0.01 : 1); }
+      }
+      return buf;
+    }
+    noiseBuffer(seconds) {
+      const ctx = this.ctx, len = Math.floor(seconds * ctx.sampleRate), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return buf;
+    }
+
+    // Pitch: a walk through just intonation. Each tier steps from the tier it came from by an
+    // interval chosen from its own hash, so the tuning never returns to where it was.
+    ratioOf(T, world) {
+      if (this.ratios.has(T)) return this.ratios.get(T);
+      let r = 1;
+      const h = T.hash >>> 0;
+      const byIdx = i => world.tiers[i] || world.extinct.find(x => x.idx === i);
+      if (T.idx === 0) r = 1;
+      else if (T.mutatedFrom != null) {
+        const P = byIdx(T.mutatedFrom); const pr = P ? this.ratioOf(P, world) : 1;
+        r = pr * Math.pow(2, ((h % 31) - 15 + (h % 2 ? 9 : -9)) / 1200); // a few cents away from the parent
+      } else if (T.parents) {
+        const [a, b] = T.parents.map(byIdx);
+        r = fold((a ? this.ratioOf(a, world) : 1) * (b ? this.ratioOf(b, world) : 1));
+      } else {
+        const P = byIdx(T.from ?? T.idx - 1);
+        r = fold((P ? this.ratioOf(P, world) : 1) * STEPS[h % STEPS.length]);
+      }
+      this.ratios.set(T, r);
+      return r;
+    }
+
+    // The rule becomes the spectrum. Survival on n neighbors sounds harmonic n+1;
+    // birth on n neighbors sounds a quieter upper band at harmonic n+10.
+    wave(T) {
+      const N = 20, re = new Float32Array(N), im = new Float32Array(N), tilt = FAMILY[T.el].tilt;
+      im[1] = 0.6;
+      for (let c = 0; c <= 8; c++) if ((T.rule.survive >> c) & 1) im[c + 1] += 1 / Math.pow(c + 1, tilt);
+      for (let c = 1; c <= 8; c++) if ((T.rule.born >> c) & 1) im[Math.min(N - 1, c + 10)] += 0.35 / Math.pow(c + 10, tilt * 0.6);
+      return this.ctx.createPeriodicWave(re, im);
+    }
+
+    voice(T, world, kind) {
+      const ctx = this.ctx, now = ctx.currentTime, f = BASE * this.ratioOf(T, world);
+      const wave = this.wave(T);
+      const a = ctx.createOscillator(), b = ctx.createOscillator();
+      a.setPeriodicWave(wave); b.setPeriodicWave(wave);
+      // Two oscillators, each with its own filter and panner, so a tier spread across the box sounds wide
+      // and a tight colony sounds like a point.
+      const chain = osc => {
+        const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = FAMILY[T.el].q; filt.frequency.value = f * 3;
+        const amp = ctx.createGain(); amp.gain.value = 0;
+        const pan = ctx.createStereoPanner();
+        osc.connect(filt); filt.connect(amp); amp.connect(pan);
+        return { filt, amp, pan };
+      };
+      const A = chain(a), B = chain(b);
+      // Comb resonance tuned to the voice: hardened border ground makes it ring.
+      const comb = ctx.createDelay(1), fb = ctx.createGain(), combOut = ctx.createGain();
+      comb.delayTime.value = 1 / f; fb.gain.value = 0.2; combOut.gain.value = 0.35;
+      A.amp.connect(comb); B.amp.connect(comb); comb.connect(fb); fb.connect(comb); comb.connect(combOut);
+      const out = ctx.createGain(); A.pan.connect(out); B.pan.connect(out);
+      const combPan = ctx.createStereoPanner(); combOut.connect(combPan); combPan.connect(out);
+      const near = ctx.createGain(), far = ctx.createGain(); near.gain.value = 0.8; far.gain.value = 0.3;
+      out.connect(near); near.connect(this.bus); out.connect(far); far.connect(this.farBus);
+      // A newborn starts where it was born in the box.
+      if (T.origin) {
+        const px = Math.max(-1, Math.min(1, (T.origin[0] / world.W) * 2 - 1));
+        A.pan.pan.value = px; B.pan.pan.value = px; combPan.pan.value = px;
+      }
+      // Gestures: a mutant glides out of its parent's pitch; a spark glides out of its parents' mean.
+      let startF = f;
+      if (kind === 'mutant' && T.mutatedFrom != null) {
+        const P = world.tiers[T.mutatedFrom]; if (P) startF = BASE * this.ratioOf(P, world);
+      } else if (kind === 'spark' && T.parents) {
+        const [p1, p2] = T.parents.map(i => world.tiers[i]);
+        if (p1 && p2) startF = BASE * Math.sqrt(this.ratioOf(p1, world) * this.ratioOf(p2, world));
+      }
+      for (const o of [a, b]) { o.frequency.setValueAtTime(startF, now); o.frequency.setTargetAtTime(f, now + 0.2, kind === 'mutant' ? 1.4 : 0.9); }
+      a.start(); b.start();
+      const v = { T, f, a, b, A, B, comb, fb, combOut, combPan, near, far, bloom: kind ? 1 : 0, bloomAt: now, dying: false };
+      this.voices.set(T, v);
+      return v;
+    }
+
+    retire(v, seconds) {
+      const now = this.ctx.currentTime;
+      // Hold the current level before fading. cancelScheduledValues alone can snap a gain back to
+      // an older value, which clicks.
+      for (const c of [v.A, v.B]) {
+        const g = c.amp.gain;
+        if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now);
+        g.setTargetAtTime(0, now, seconds / 7);
+      }
+      v.fb.gain.setTargetAtTime(0, now + seconds * 0.5, seconds / 7);
+      const end = now + seconds * 1.2;
+      v.a.stop(end); v.b.stop(end);
+      setTimeout(() => { try { v.near.disconnect(); v.far.disconnect(); } catch (e) {} }, (seconds * 1.2 + 1) * 1000);
+      this.voices.delete(v.T);
+    }
+
+    event(ev, world, params) {
+      if (!this.ctx) return;
+      if (ev.tier !== undefined) {
+        const T = world.tiers[ev.tier];
+        if (T && !this.voices.has(T)) this.voice(T, world, T.mutatedFrom != null ? 'mutant' : T.parents ? 'spark' : 'birth');
+      }
+      if (ev.dying !== undefined) {
+        // Retreat: the voice sinks an octave and fades as the ground is given back.
+        const v = this.voices.get(world.tiers[ev.dying]);
+        if (v) {
+          v.dying = true;
+          const now = this.ctx.currentTime, dur = Math.max(3, world.retreat ? world.retreat.dur / (60 * Math.max(0.25, params.speed)) : 6);
+          for (const o of [v.a, v.b]) o.frequency.setTargetAtTime(v.f / 2, now, dur / 3);
+        }
+      }
+    }
+
+    reset() {
+      if (!this.ctx) { this.voices.clear(); this.ratios.clear(); return; }
+      for (const v of [...this.voices.values()]) this.retire(v, 1.5);
+      this.ratios.clear();
+    }
+
+    // Called once per animation frame with the world's latest statistics.
+    update(world, params) {
+      if (!this.running || !world.stats) return;
+      const ctx = this.ctx, now = ctx.currentTime, n = world.W * world.H, S = world.stats;
+      // Parameters change about 15 times a second; per-frame automation overloads the audio thread.
+      if (now - (this.lastUpdate || 0) < this.updateEvery) return;
+      this.lastUpdate = now;
+      // Only tiers that hold ground get a voice, up to MAX of the largest. Others fade out and
+      // return when they regain territory.
+      const MAX = this.maxVoices, minCells = n * 0.002;
+      const wanted = world.tiers.filter(T => T.cells >= minCells || T.dying).sort((a, b) => b.cells - a.cells).slice(0, MAX);
+      const want = new Set(wanted);
+      for (const v of [...this.voices.values()]) {
+        if (want.has(v.T)) { v.quietSince = null; continue; }
+        const gone = !world.tiers.includes(v.T);
+        v.quietSince ??= now;
+        if (gone || now - v.quietSince > 1.5) this.retire(v, v.dying ? 3 : 2);
+      }
+      for (const T of wanted) if (!this.voices.has(T)) this.voice(T, world, null);
+      for (const v of this.voices.values()) {
+        const T = v.T, i = T.idx;
+        if (i >= S.live.length) continue;
+        const cover = T.cells / n, live = S.live[i], dens = T.cells ? live / T.cells : 0;
+        const motion = live ? S.move[i] / Math.max(1, T.cells) : 0;
+        const contest = S.contest[i] / Math.max(1, T.cells);
+        const wall = T.cells ? S.wall[i] / T.cells : 0;
+        const fed = live ? S.fed[i] / Math.max(1, T.cells) : 0;
+        // Loudness follows territory, sustained by how alive that territory is.
+        const bloom = v.bloom * Math.exp(-(now - v.bloomAt) / 4);
+        let g = (Math.sqrt(cover) * 0.16 + bloom * 0.06) * (0.35 + Math.min(1, dens * 4) * 0.65);
+        if (v.dying) g *= 0.6;
+        v.A.amp.gain.setTargetAtTime(g, now, 0.6); v.B.amp.gain.setTargetAtTime(g, now, 0.6);
+        // Brightness follows motion and feeding; births open bright and settle.
+        const cutoff = v.f * (1.5 + Math.min(1, motion * 25) * 10 + Math.min(1, fed * 6) * 6 + bloom * 12);
+        // Distance darkens a little: high in the box is far away.
+        const depth = v.depth ?? 0.5;
+        const dark = 1 - 0.35 * (1 - depth);
+        for (const c of [v.A, v.B]) c.filt.frequency.setTargetAtTime(Math.min(16000, cutoff * dark), now, 0.4);
+        // Contested borders beat: the two oscillators pull apart with pressure.
+        const cents = 2 + Math.min(1, contest * 4) * 28;
+        v.a.detune.setTargetAtTime(cents / 2, now, 0.5); v.b.detune.setTargetAtTime(-cents / 2, now, 0.5);
+        // Hardened ground rings through the comb.
+        v.fb.gain.setTargetAtTime(Math.min(0.88, 0.15 + Math.min(1, wall / Math.max(0.5, params.hardness)) * 0.75), now, 0.8);
+        // Stereo position follows where the tier's living cells sit on the torus.
+        // Space: left-right in the box is left-right in the stereo field, and top-to-bottom is far-to-near.
+        // On the torus the center of a colony is a circular mean; how concentrated it is sets the width.
+        if (live) {
+          const Rx = Math.hypot(S.cos[i], S.sin[i]) / live, thx = Math.atan2(S.sin[i], S.cos[i]);
+          const Ry = Math.hypot(S.cosY[i], S.sinY[i]) / live, thy = Math.atan2(S.sinY[i], S.cosY[i]);
+          const fx = ((thx / (2 * Math.PI)) + 1) % 1, fy = ((thy / (2 * Math.PI)) + 1) % 1;
+          // When the box is turned 90° for a portrait screen, the mapping follows the screen:
+          // screen left-right is world bottom-to-top, screen top-to-bottom is world left-to-right.
+          const [px, pR, dy, dR] = this.rotated ? [1 - fy, Ry, fx, Rx] : [fx, Rx, fy, Ry];
+          const focus = Math.min(1, pR * 2.2), pos = (px * 2 - 1) * focus;
+          const width = 0.06 + 0.9 * (1 - focus);
+          const clamp = q => Math.max(-1, Math.min(1, q));
+          v.A.pan.pan.setTargetAtTime(clamp(pos - width), now, 0.6);
+          v.B.pan.pan.setTargetAtTime(clamp(pos + width), now, 0.6);
+          v.combPan.pan.setTargetAtTime(clamp(pos), now, 0.6);
+          const dFocus = Math.min(1, dR * 2.2);
+          v.depth = 0.5 + (dy - 0.5) * dFocus; // 0 = top of the screen (far), 1 = bottom (near)
+          v.near.gain.setTargetAtTime(0.35 + 0.65 * v.depth, now, 0.8);
+          v.far.gain.setTargetAtTime(0.15 + 0.6 * (1 - v.depth), now, 0.8);
+        }
+      }
+      // Tension: the riser climbs as frontier surprise approaches the emergence threshold.
+      const thr = world.record * (1 + params.margin);
+      const ready = world.frontierAge > (world.warm ?? params.warmup) && !world.retreat && thr > 0;
+      const r = ready ? world.lastMax / thr : world.search ? 1 : 0;
+      const t = Math.max(0, Math.min(1, (r - 0.55) / 0.45));
+      this.riseGain.gain.setTargetAtTime(0.05 * t * t, now, 0.5);
+      this.riseFilter.frequency.setTargetAtTime(250 + 3800 * t * t, now, 0.5);
+      // Quiet: past the typical epoch the drone thins and the room grows.
+      const over = Math.max(0, Math.min(1, (world.gen - world.lastBirth) / world.meanEpoch - 1));
+      this.bus.gain.setTargetAtTime(1 - 0.45 * over, now, 2);
+      this.farBus.gain.setTargetAtTime(1 - 0.3 * over, now, 2);
+      this.wet.gain.setTargetAtTime(0.7 + 0.5 * over, now, 2);
+    }
+  }
+  return { Engine };
+})();
+</script>
+<script>
+// CRT look as a two-pass WebGL filter over the world canvas. View only: it reads the drawn
+// canvas and never touches the simulation.
+//   Pass 1, at world resolution: phosphor persistence. Each cell keeps the brighter of its new
+//     color and a decayed copy of last frame, so moving cells leave short glowing trails.
+//   Pass 2, at screen resolution: the tube (beam, phosphor mask, glow; see SCREEN below),
+//     plus barrel curvature, vignette, grain and a faint flicker.
+const CRT = (() => {
+  const VERT = `attribute vec2 p; varying vec2 v; void main(){ v = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`;
+  const PHOS = `precision mediump float;
+uniform sampler2D src, prev; uniform float decay; varying vec2 v;
+void main(){ vec3 c = texture2D(src, v).rgb; vec3 q = texture2D(prev, v).rgb * decay; gl_FragColor = vec4(max(c, q), 1.0); }`;
+  // The tube. Everything is computed in linear light and converted back at the end.
+  //  - Beam: each world row is a horizontal beam pass. Across a row, neighbouring cells blend with a
+  //    gaussian spot. Down the screen, each row's light falls off as a gaussian whose width grows
+  //    with brightness, so bright rows swell into the gaps and dim rows stay thin.
+  //  - Mask: separate red, green and blue phosphors with dark gaps between them. Grille is
+  //    Trinitron-style stripes, slot is a consumer TV's staggered slots, dots is a monitor's
+  //    staggered dot triads. The mask darkens strongly, then the image is lifted to compensate.
+  //  - Glow: a soft unmasked halo from the glass, added after the mask.
+  const SCREEN = `precision mediump float;
+uniform sampler2D phos, osd; uniform vec2 srcSize, outSize; uniform float time, maskType, glitchY, glitchAmt, osdAmt; varying vec2 v;
+vec2 curve(vec2 uv){ uv = uv * 2.0 - 1.0; uv.x *= 1.0 + 0.035 * uv.y * uv.y; uv.y *= 1.0 + 0.05 * uv.x * uv.x; return uv * 0.5 + 0.5; }
+float hash(vec2 q){ return fract(sin(dot(q, vec2(12.9898, 78.233))) * 43758.5453); }
+vec3 lin(vec3 c){ return pow(c, vec3(2.2)); }
+vec3 cell(float cx, float cy){ return lin(texture2D(phos, (vec2(cx, cy) + 0.5) / srcSize).rgb); }
+vec3 rowColor(float r, float x){
+  float c0 = floor(x);
+  vec3 acc = vec3(0.0); float ws = 0.0;
+  for (int k = -1; k <= 1; k++) {
+    float cx = c0 + float(k); float d = (cx + 0.5) - x;
+    float w = exp(-d * d * 3.2);
+    acc += cell(cx, r) * w; ws += w;
+  }
+  return acc / ws;
+}
+vec3 beam(vec3 c, float dy){
+  float l = max(max(c.r, c.g), c.b);
+  float w = mix(0.16, 0.34, sqrt(l));
+  return c * exp(-0.5 * dy * dy / (w * w)) * (0.4 / w);
+}
+// The mask is laid out in the same curved cell coordinates as the picture, with a whole number
+// of triads per cell and slot breaks on the gaps between rows, so mask and picture never drift
+// or beat against each other. x is in cells, y in rows (row gaps fall on whole numbers).
+vec3 mask(float x, float y, float n){
+  float tx = x * n, ti = floor(tx);
+  vec3 d = abs(vec3(fract(tx) * 3.0) - vec3(0.5, 1.5, 2.5));
+  vec3 m = vec3(0.18) + 0.82 * clamp(1.6 - d * 2.2, 0.0, 1.0);
+  if (maskType > 0.5) {
+    float h = maskType > 1.5 ? 0.5 : 1.0;
+    float g = fract(y / h + mod(ti, 2.0) * 0.5);
+    float dist = min(g, 1.0 - g), br = maskType > 1.5 ? 0.2 : 0.1;
+    m *= mix(0.3, 1.0, smoothstep(br * 0.5, br, dist));
+  }
+  return m;
+}
+void main(){
+  vec2 uv = curve(v);
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  // Tape timebase: each row is shifted sideways a little, wandering slowly; a dropout tears a band
+  // of rows; the last rows at the bottom carry the head-switching skew of a VCR.
+  float rowN = floor(uv.y * srcSize.y);
+  float jit = (hash(vec2(rowN, floor(time * 24.0))) - 0.5) * 0.08 + sin(uv.y * 9.0 + time * 1.7) * 0.05;
+  float band = glitchAmt * smoothstep(0.018, 0.0, abs(uv.y - glitchY));
+  float head = smoothstep(0.014, 0.0, uv.y);
+  float x = uv.x * srcSize.x + jit + band * (hash(vec2(rowN, time)) - 0.5) * 6.0 + head * (1.5 + hash(vec2(rowN, floor(time * 30.0))) * 2.0);
+  float y = uv.y * srcSize.y - 0.5;
+  float r0 = floor(y), f = y - r0;
+  vec3 a = rowColor(r0, x), b = rowColor(r0 + 1.0, x);
+  vec3 scan = beam(a, f) + beam(b, 1.0 - f);
+  float rowPx = outSize.y / srcSize.y;
+  vec3 soft = mix(a, b, smoothstep(0.0, 1.0, f));
+  vec3 col = mix(soft, scan, clamp((rowPx - 1.8) / 1.5, 0.0, 1.0));
+  // Triads per cell; below about 3 screen pixels per cell the mask can't be drawn cleanly, so it fades out.
+  float cellPx = outSize.x / srcSize.x;
+  float n = max(1.0, floor(cellPx / 3.0 + 0.001));
+  float amt = clamp((cellPx - 2.5) / 1.5, 0.0, 1.0);
+  // On-screen menu: drawn into the tube as light, before the mask, so it gets the same curvature,
+  // scanlines and phosphors as the picture, the way a television's own menu did.
+  if (osdAmt > 0.0) {
+    vec4 o = texture2D(osd, uv);
+    float sp = exp(-0.5 * f * f / 0.09) + exp(-0.5 * (1.0 - f) * (1.0 - f) / 0.09);
+    sp = mix(1.0, sp, clamp((rowPx - 1.8) / 1.5, 0.0, 1.0));
+    col = col * (1.0 - o.a * osdAmt * 0.8) + lin(o.rgb) * o.a * osdAmt * 1.5 * sp;
+  }
+  col *= mix(vec3(1.0), mask(x, uv.y * srcSize.y, n) * 2.35, amt);
+  vec2 px = 1.0 / srcSize;
+  vec3 glow = lin(texture2D(phos, uv + px * vec2(2.0, 0.0)).rgb) + lin(texture2D(phos, uv - px * vec2(2.0, 0.0)).rgb)
+            + lin(texture2D(phos, uv + px * vec2(0.0, 2.0)).rgb) + lin(texture2D(phos, uv - px * vec2(0.0, 2.0)).rgb)
+            + lin(texture2D(phos, uv + px * vec2(1.4, 1.4)).rgb) + lin(texture2D(phos, uv - px * vec2(1.4, 1.4)).rgb);
+  col += glow * 0.035;
+  vec2 d = uv - 0.5;
+  col *= smoothstep(0.0, 0.012, uv.x) * smoothstep(0.0, 0.012, uv.y) * smoothstep(0.0, 0.012, 1.0 - uv.x) * smoothstep(0.0, 0.012, 1.0 - uv.y);
+  col *= 1.0 - dot(d, d) * 1.1;
+  col *= 0.985 + 0.015 * sin(time * 50.0);
+  col = pow(max(col, 0.0), vec3(1.0 / 2.2));
+  col += (hash(gl_FragCoord.xy + fract(time) * 100.0) - 0.5) * (0.03 + band * 0.5 + head * 0.15);
+  col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))), band * 0.7);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+  function create(canvas) {
+    let gl = null;
+    try { gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false }); } catch (e) {}
+    if (!gl) return null;
+    canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+    const compile = (type, src) => {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const program = frag => {
+      const pr = gl.createProgram();
+      gl.attachShader(pr, compile(gl.VERTEX_SHADER, VERT)); gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, frag));
+      gl.bindAttribLocation(pr, 0, 'p'); gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+      return pr;
+    };
+    let phosProg, screenProg;
+    try { phosProg = program(PHOS); screenProg = program(SCREEN); } catch (e) { console.warn('CRT filter unavailable:', e.message); return null; }
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const tex = (filter) => {
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return t;
+    };
+    const srcTex = tex(gl.NEAREST);
+    const osdTex = tex(gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+    let W = 0, H = 0, ping = null, pong = null, wantW = 0, wantH = 0, steady = 0;
+    // Linear filtering: the beam samples exact cell centres (unaffected), while the glow's
+    // in-between taps blend smoothly instead of showing square blocks.
+    const target = () => {
+      const t = tex(gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      return { t, fb };
+    };
+    const u = (pr, name) => gl.getUniformLocation(pr, name);
+    const loc = {
+      src: u(phosProg, 'src'), prev: u(phosProg, 'prev'), decay: u(phosProg, 'decay'),
+      phos: u(screenProg, 'phos'), srcSize: u(screenProg, 'srcSize'), outSize: u(screenProg, 'outSize'), time: u(screenProg, 'time'),
+      maskType: u(screenProg, 'maskType'), glitchY: u(screenProg, 'glitchY'), glitchAmt: u(screenProg, 'glitchAmt'),
+      osd: u(screenProg, 'osd'), osdAmt: u(screenProg, 'osdAmt'),
+    };
+    return {
+      // Draws one frame from the world canvas `source` at the CSS size of the CRT canvas.
+      // 0 = aperture grille, 1 = slot mask, 2 = dot triads.
+      maskType: 1,
+      get lost() { return gl.isContextLost(); },
+      glitchY: 0.5, glitchAmt: 0, osdAmt: 0,
+      // Uploads a freshly drawn on-screen-menu canvas; call only when its contents changed.
+      setOsd(c) {
+        if (gl.isContextLost()) return;
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, osdTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+      },
+      render(source, timeSec) {
+        if (gl.isContextLost()) return;
+        // Resize the drawing buffer only once the on-screen size has held still for a few frames.
+        // Resizing every frame through a full-screen transition churns GPU buffers, and some
+        // browsers then leave stale frames on screen.
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const cw0 = Math.max(1, Math.round(canvas.clientWidth * dpr)), ch0 = Math.max(1, Math.round(canvas.clientHeight * dpr));
+        if (cw0 !== canvas.width || ch0 !== canvas.height) {
+          if (cw0 === wantW && ch0 === wantH) { if (++steady >= 8 || canvas.width < 2) { canvas.width = cw0; canvas.height = ch0; } }
+          else { wantW = cw0; wantH = ch0; steady = 0; if (canvas.width < 2) { canvas.width = cw0; canvas.height = ch0; } }
+        }
+        const cw = canvas.width, ch = canvas.height;
+        if (source.width !== W || source.height !== H) {
+          for (const t of [ping, pong]) if (t) { gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.t); }
+          W = source.width; H = source.height; ping = target(); pong = target();
+        }
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        // Pass 1: persistence into `ping`, reading last frame from `pong`.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, ping.fb); gl.viewport(0, 0, W, H);
+        gl.useProgram(phosProg);
+        gl.uniform1i(loc.src, 0);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, pong.t); gl.uniform1i(loc.prev, 1);
+        gl.uniform1f(loc.decay, 0.42);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        // Pass 2: the tube, to the screen.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cw, ch);
+        gl.useProgram(screenProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ping.t); gl.uniform1i(loc.phos, 0);
+        gl.uniform2f(loc.srcSize, W, H); gl.uniform2f(loc.outSize, cw, ch); gl.uniform1f(loc.time, timeSec);
+        gl.uniform1f(loc.maskType, this.maskType);
+        gl.uniform1f(loc.glitchY, this.glitchY); gl.uniform1f(loc.glitchAmt, this.glitchAmt);
+        gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, osdTex); gl.uniform1i(loc.osd, 2);
+        gl.uniform1f(loc.osdAmt, this.osdAmt);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        const t = ping; ping = pong; pong = t;
+      },
+    };
+  }
+  // The tube's barrel mapping, for turning a pointer position on the glass into picture coordinates.
+  // x, y in 0..1 with y pointing up, exactly as the shader's curve().
+  function curve(x, y) {
+    x = x * 2 - 1; y = y * 2 - 1;
+    x *= 1 + 0.035 * y * y; y *= 1 + 0.05 * x * x;
+    return [x * 0.5 + 0.5, y * 0.5 + 0.5];
+  }
+  return { create, curve };
+})();
+</script>
+<script>
+// On-screen menu in the style of a 1990s television: a blocky, two-column list in a translucent
+// box, the selected row in inverse, values with ◂ ▸ adjusters, and a big channel-style readout in
+// the corner. It is drawn to its own canvas and handed to the CRT shader, which puts it on the glass
+// with the same curvature, scanlines and phosphors as the picture.
+const OSD = (() => {
+  const FONT = '"VT323", "Courier New", monospace';
+  class Menu {
+    constructor() {
+      this.canvas = document.createElement('canvas');
+      this.g = this.canvas.getContext('2d');
+      this.sel = 0; this.rows = [];
+      try { document.fonts && document.fonts.load('40px "VT323"'); } catch (e) {}
+    }
+    resize(W, H) {
+      const w = 960, h = Math.round(960 * H / W);
+      if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
+    }
+    // items: [{label, value?(), bar?(), act?, dec?, inc?, disabled?}]; status: {big, line}
+    // view: {menu: show the menu box, bar: [{label, act, disabled?}] for the strip along the bottom}
+    // On an upright phone the picture is turned 90°; `rot` draws the text turned back so it reads
+    // upright on the glass. cw/ch below are the upright (screen-facing) width and height.
+    draw(items, status, view) {
+      const g = this.g, pw0 = this.canvas.width, ph0 = this.canvas.height;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, pw0, ph0);
+      if (this.rot) g.setTransform(0, -1, 1, 0, 0, ph0);
+      const cw = this.rot ? ph0 : pw0, ch = this.rot ? pw0 : ph0;
+      this.cw = cw; this.ch = ch; this.touch = !!view.touch;
+      this.rows = []; this.barRects = [];
+      const s = Math.min(ch / 18.5, cw / 24);
+      if (!view.menu) { if (view.bar) this.drawBar(view.bar, status, s, cw, ch); return; }
+      // On touch screens the box widens to nearly the full screen width for bigger rows to tap,
+      // and drops below the channel readout instead of sharing the top with it.
+      const sz = this.touch ? Math.min(ch / 18.5, (cw * 0.9) / 13.5) : s;
+      const rowH = sz * 1.08, pw = sz * 13.5;
+      const x0 = this.touch ? (cw - pw) / 2 : cw * 0.06, y0 = this.touch ? ch * 0.13 : ch * 0.08;
+      const ry = this.touch ? ch * 0.03 : y0;
+      const ph = rowH * (items.length + 2.6);
+      g.textBaseline = 'middle';
+      // Channel-style readout, top right.
+      g.font = `${s * (this.touch ? 1.4 : 2)}px ${FONT}`; g.textAlign = 'right';
+      this.text(status.big, cw - cw * 0.06, ry + s * 0.9, '#7dff8a');
+      g.font = `${s * 0.95}px ${FONT}`;
+      if (this.touch) { g.textAlign = 'left'; this.text(status.line, cw * 0.06, ry + s * 0.9, '#7dff8a'); }
+      else this.text(status.line, cw - cw * 0.06, ry + s * 2.3, '#7dff8a');
+      // Menu box.
+      g.fillStyle = 'rgba(8, 18, 92, 0.8)'; g.fillRect(x0, y0, pw, ph);
+      g.strokeStyle = 'rgba(120, 220, 255, 0.9)'; g.lineWidth = Math.max(2, sz * 0.08); g.strokeRect(x0, y0, pw, ph);
+      g.font = `${sz}px ${FONT}`; g.textAlign = 'left';
+      this.text('CULTURE', x0 + sz * 0.6, y0 + rowH * 0.75, '#ffe65c');
+      g.fillStyle = 'rgba(120, 220, 255, 0.9)'; g.fillRect(x0 + sz * 0.6, y0 + rowH * 1.35, pw - sz * 1.2, Math.max(2, sz * 0.06));
+      this.rows = [];
+      items.forEach((it, i) => {
+        const top = y0 + rowH * (1.6 + i), mid = top + rowH / 2, sel = i === this.sel;
+        if (sel) { g.fillStyle = 'rgba(110, 230, 255, 0.95)'; g.fillRect(x0 + sz * 0.3, top, pw - sz * 0.6, rowH); }
+        const fg = it.disabled ? '#6b7aa8' : sel ? '#06103f' : '#f2f6ff';
+        g.textAlign = 'left'; this.text(it.label, x0 + sz * 0.7, mid, fg, !sel);
+        const valX = x0 + pw * 0.5, right = x0 + pw - sz * 0.7;
+        if (it.bar) {
+          const n = 10, filled = Math.round(it.bar() * n), bw = (right - valX - sz * 1.4) / n;
+          g.textAlign = 'left'; this.text('<', valX, mid, fg, !sel);
+          for (let k = 0; k < n; k++) {
+            g.fillStyle = k < filled ? fg : (sel ? 'rgba(6,16,63,0.3)' : 'rgba(242,246,255,0.25)');
+            g.fillRect(valX + sz * 0.7 + k * bw, mid - sz * 0.28, bw * 0.7, sz * 0.56);
+          }
+          g.textAlign = 'right'; this.text('>', right, mid, fg, !sel);
+        } else if (it.value) {
+          const v = it.value();
+          g.textAlign = 'right';
+          this.text(it.dec || it.inc ? `<  ${v}  >` : v, right, mid, fg, !sel);
+        }
+        this.rows.push({ top, bottom: top + rowH, left: x0, right: x0 + pw, valX, item: it });
+      });
+      g.textAlign = 'left'; g.font = `${sz * 0.75}px ${FONT}`;
+      this.text(this.touch ? 'TAP TO SELECT   TAP < > TO ADJUST' : 'UP/DN SELECT   </> ADJUST   ENTER OK', x0 + sz * 0.6, y0 + ph - rowH * 0.5, '#9fb4ff');
+    }
+    // VCR-style strip of key hints across the bottom, in the deck's green lettering.
+    drawBar(bar, status, s, cw, ch) {
+      const g = this.g;
+      g.textBaseline = 'middle';
+      g.font = `${s * 1.25}px ${FONT}`; g.textAlign = 'right';
+      this.text(status.big, cw - cw * 0.06, ch * 0.08 + s * 0.6, '#7dff8a');
+      // Touch screens get bigger lettering (bigger tap targets), wrapped onto two lines if needed.
+      const size = s * (this.touch ? 1.6 : 1.15); let gap = size * 1.2;
+      g.font = `${size}px ${FONT}`; g.textAlign = 'left';
+      // Each entry gets a fixed slot sized for its longest wording (e.g. SOUND OFF vs SOUND ON), so
+      // toggling a state never shifts the strip or changes where it wraps.
+      const measure = () => bar.map(b => Math.max(g.measureText(b.label).width, b.reserve ? g.measureText(b.reserve).width : 0));
+      let widths = measure(), maxW = cw * 0.9;
+      // With a keyboard, keep the strip on one line and shrink the lettering to fit if needed.
+      if (!this.touch) {
+        const total = widths.reduce((a, w) => a + w, 0) + gap * (bar.length - 1);
+        if (total > maxW) { const k = maxW / total; g.font = `${size * k}px ${FONT}`; widths = measure(); gap *= k; }
+      }
+      const lines = [[]]; let lw = 0;
+      bar.forEach((b, i) => {
+        const add = widths[i] + (lines[lines.length - 1].length ? gap : 0);
+        if (this.touch && lw + add > maxW && lines[lines.length - 1].length) { lines.push([]); lw = 0; }
+        lines[lines.length - 1].push(i); lw += widths[i] + (lines[lines.length - 1].length > 1 ? gap : 0);
+      });
+      const lineH = size * 1.25;
+      lines.forEach((ln, li) => {
+        const total = ln.reduce((a, i) => a + widths[i], 0) + gap * (ln.length - 1);
+        let x = (cw - total) / 2;
+        const y = ch * 0.92 - (lines.length - 1 - li) * lineH;
+        for (const i of ln) {
+          const b = bar[i];
+          g.textAlign = 'center';
+          this.text(b.label, x + widths[i] / 2, y, b.disabled ? '#3f7a48' : '#7dff8a');
+          g.textAlign = 'left';
+          this.barRects.push({ left: x - gap / 2, right: x + widths[i] + gap / 2, top: y - lineH / 2, bottom: y + lineH / 2, item: b });
+          x += widths[i] + gap;
+        }
+      });
+    }
+    hitBar(mx0, my0) {
+      const [mx, my] = this.upright(mx0, my0);
+      for (const r of this.barRects || []) if (mx >= r.left && mx < r.right && my >= r.top && my <= r.bottom) return r.item;
+      return null;
+    }
+    text(str, x, y, color, shadow = true) {
+      const g = this.g;
+      if (shadow) { g.fillStyle = 'rgba(0,0,0,0.85)'; g.fillText(str, x + 2, y + 2); }
+      g.fillStyle = color; g.fillText(str, x, y);
+    }
+    // Which row (and which side of an adjustable value) a point in menu-canvas pixels falls on.
+    upright(mx, my) { return this.rot ? [this.canvas.height - my, mx] : [mx, my]; }
+    hit(mx0, my0) {
+      const [mx, my] = this.upright(mx0, my0);
+      for (let i = 0; i < this.rows.length; i++) {
+        const r = this.rows[i];
+        if (my >= r.top && my < r.bottom && mx >= r.left && mx <= r.right) {
+          let side = null;
+          if ((r.item.dec || r.item.inc || r.item.bar) && mx >= r.valX) side = mx < (r.valX + r.right) / 2 ? 'dec' : 'inc';
+          return { i, side };
+        }
+      }
+      return null;
+    }
+  }
+  return { Menu };
+})();
+</script>
+<script>
+// Replay recorder, like a high-speed camera's pre-record buffer. While "keep last 15 s" is on,
+// a new encoder starts every few seconds on a composited copy of the view, and old ones are
+// dropped, so there is always one encoder that began 15–20 s ago. Pressing Record keeps that
+// one running (the backlog) and discards the rest; Stop finishes it into a single video file.
+// Each encoder produces a complete, playable file, which is why no trimming or remuxing is needed.
+const Recorder = (() => {
+  const MIMES = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  class Replay {
+    constructor({ touch }) {
+      this.touch = touch;
+      this.BACK = 15; this.SEG = touch ? 7.5 : 5;
+      this.mime = (window.MediaRecorder && MIMES.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; } })) || '';
+      this.canvas = document.createElement('canvas');
+      this.canvas.setAttribute('aria-hidden', 'true');
+      this.canvas.style.cssText = 'position:fixed;left:-10000px;top:0;width:2px;height:2px;pointer-events:none';
+      document.body.appendChild(this.canvas);
+      this.g = this.canvas.getContext('2d');
+      this.supported = !!(this.mime && this.canvas.captureStream);
+      this.segs = []; this.keeper = null; this.armed = false; this.video = null; this.shape = '';
+    }
+    get ext() { return this.mime.startsWith('video/mp4') ? 'mp4' : 'webm'; }
+    get busy() { return this.armed || !!this.keeper; }
+    // Output size depends only on the world's shape, so changing world size mid-recording is safe.
+    setShape(square) {
+      const shape = square ? 'square' : 'wide';
+      if (shape === this.shape) return;
+      if (this.keeper) { this.pendingShape = square; return; }
+      this.shape = shape;
+      const long = this.touch ? 1280 : 1920;
+      if (square) { this.canvas.width = this.canvas.height = this.touch ? 720 : 1080; }
+      else { this.canvas.width = long; this.canvas.height = Math.round(long * 140 / 220 / 2) * 2; }
+      this.g.fillStyle = '#000'; this.g.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.dropAll();
+      if (this.video) { this.video.getTracks().forEach(t => t.stop()); this.video = null; }
+    }
+    // Called every animation frame, in the same task the view was drawn (a WebGL canvas can only
+    // be copied before the browser presents it).
+    frame(source, smooth, overlay) {
+      if (!this.busy) return;
+      const g = this.g, w = this.canvas.width, h = this.canvas.height;
+      g.imageSmoothingEnabled = smooth;
+      g.drawImage(source, 0, 0, w, h);
+      if (overlay) { g.imageSmoothingEnabled = true; g.drawImage(overlay, 0, 0, w, h); }
+    }
+    stream(audio) {
+      if (!this.video) this.video = this.canvas.captureStream(30);
+      return new MediaStream([...this.video.getVideoTracks(), ...(audio ? audio.getAudioTracks() : [])]);
+    }
+    startSeg(audio) {
+      const chunks = [];
+      const rec = new MediaRecorder(this.stream(audio), { mimeType: this.mime, videoBitsPerSecond: this.touch ? 5e6 : 10e6 });
+      rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.start(1000);
+      const seg = { rec, chunks, t0: performance.now() };
+      this.segs.push(seg);
+      return seg;
+    }
+    drop(seg) { try { seg.rec.ondataavailable = null; if (seg.rec.state !== 'inactive') seg.rec.stop(); } catch (e) {} }
+    dropAll() { for (const s of this.segs) if (s !== this.keeper) this.drop(s); this.segs = this.keeper ? [this.keeper] : []; }
+    tick(audio) {
+      if (!this.armed || this.keeper) return;
+      const now = performance.now(), last = this.segs[this.segs.length - 1];
+      if (!last || now - last.t0 >= this.SEG * 1000) this.startSeg(audio);
+      const keepFrom = now - (this.BACK + this.SEG) * 1000 - 500;
+      while (this.segs.length > 1 && this.segs[0].t0 < keepFrom && this.segs[1].t0 <= now - this.BACK * 1000) this.drop(this.segs.shift());
+    }
+    arm(on) { this.armed = on; if (!on) this.dropAll(); }
+    // Starts keeping video. Returns the seconds of backlog included.
+    start(audio) {
+      if (this.keeper) return 0;
+      const now = performance.now();
+      let pick = null;
+      for (const s of this.segs) if (now - s.t0 >= this.BACK * 1000) pick = s;
+      if (!pick) pick = this.segs[0] || this.startSeg(audio);
+      this.keeper = pick;
+      this.dropAll();
+      return (now - pick.t0) / 1000;
+    }
+    elapsed() { return this.keeper ? (performance.now() - this.keeper.t0) / 1000 : 0; }
+    stop() {
+      const k = this.keeper;
+      if (!k) return Promise.resolve(null);
+      return new Promise(resolve => {
+        k.rec.onstop = () => {
+          this.keeper = null; this.segs = [];
+          if (this.pendingShape !== undefined) { const s = this.pendingShape; this.pendingShape = undefined; this.setShape(s); }
+          resolve(new Blob(k.chunks, { type: this.mime.split(';')[0] }));
+        };
+        k.rec.stop();
+      });
+    }
+  }
+  return { Replay };
+})();
+</script>
+<script>
+(() => {
+  // Two shapes, five sizes each, with matching cell counts.
+  const SHAPES = {
+    wide: [[165, 105], [220, 140], [330, 210], [440, 280], [550, 350]],
+    square: [[132, 132], [176, 176], [264, 264], [352, 352], [440, 440]],
+  };
+  let shape = 'wide';
+  const sizes = () => SHAPES[shape];
+  let W = 220, H = 140;
+  const $ = id => document.getElementById(id);
+  const cv = $('world'), ctx = cv.getContext('2d');
+  let img = ctx.createImageData(W, H);
+  const fx = $('fx'), fctx = fx.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sonic = new Sonic.Engine();
+  let markers = false;
+  let touch = false;
+  try { touch = matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  const replay = new Recorder.Replay({ touch });
+  // CRT filter: created on first use; unavailable where WebGL is.
+  let crtOn = false, crt = null;
+  // With CRT on in full screen, the controls become the television's own on-screen menu.
+  const osd = new OSD.Menu();
+  let osdDrawn = 0, wokeFromIdle = false;
+  const osdActive = () => crtOn && !!crt && isFull();
+  const osdItems = () => [
+    { label: 'PICTURE', value: () => (running ? 'PLAY' : 'PAUSE'), act: () => setRunning(!running) },
+    { label: 'SPEED', value: () => $('speedo').textContent.replace('×', 'X'), dec: () => nudgeSpeed(-1), inc: () => nudgeSpeed(1) },
+    { label: 'SIZE', value: () => $('hsizeo').textContent.replace('×', 'X'), dec: () => stepSize(-1), inc: () => stepSize(1) },
+    { label: 'EMERGE', act: () => handle(world.forceEmerge(params)) },
+    { label: 'NEW WORLD', act: () => { newWorld(); layout(); } },
+    { label: 'RECORD', disabled: !replay.supported, act: () => toggleRecord(),
+      value: () => replay.keeper ? `REC ${Math.floor(replay.elapsed() / 60)}:${String(Math.floor(replay.elapsed()) % 60).padStart(2, '0')}` : replay.armed ? 'BUFFERING' : 'READY' },
+    { label: 'SOUND', value: () => (soundOn ? 'ON' : 'OFF'), act: () => toggleSound() },
+    { label: 'VOLUME', bar: () => $('volume').value / 100, dec: () => nudgeVolume(-10), inc: () => nudgeVolume(10) },
+    { label: 'MASK', value: () => MASKS[crt ? crt.maskType : 1].toUpperCase(), act: () => cycleMask(1), dec: () => cycleMask(-1), inc: () => cycleMask(1) },
+    { label: 'SCREEN', value: () => (fillMode ? 'FILL' : 'FIT'), act: () => $('hfill').click() },
+    { label: 'CRT', value: () => 'ON', act: () => setCrt(false) },
+    { label: 'EXIT', act: () => exitFull() },
+  ];
+  let osdList = null, menuOpen = false, menuTimer = 0;
+  // The menu box opens only on M (or its hint); like a television's, it closes itself after
+  // 10 s without input. Mouse movement only brings up the hint strip along the bottom.
+  function openMenu(o) {
+    menuOpen = o; clearTimeout(menuTimer); osdDrawn = 0;
+    if (o) menuTimer = setTimeout(() => { menuOpen = false; osdDrawn = 0; }, 10000);
+  }
+  // On touch screens the strip drops the key letters: every entry is a tap target instead.
+  const barItems = () => {
+    const k = touch ? '' : 'x ';
+    return [
+      { label: running ? 'PLAY \u25B6' : 'PAUSE \u2759\u2759', reserve: 'PAUSE \u2759\u2759', act: () => setRunning(!running) },
+      { label: k.replace('x', 'E') + 'EMERGE', act: () => handle(world.forceEmerge(params)) },
+      { label: k.replace('x', 'R') + (replay.keeper ? 'STOP' : 'REC'), reserve: k.replace('x', 'R') + 'STOP', act: () => toggleRecord(), disabled: !replay.supported },
+      { label: k.replace('x', 'S') + (soundOn ? 'SOUND ON' : 'SOUND OFF'), reserve: k.replace('x', 'S') + 'SOUND OFF', act: () => toggleSound() },
+      { label: k.replace('x', 'M') + 'MENU', act: () => openMenu(true) },
+      { label: k.replace('x', 'F') + 'EXIT', act: () => exitFull() },
+    ];
+  };
+  function nudgeVolume(d) { const el = $('volume'); el.value = Math.max(0, Math.min(100, +el.value + d)); el.dispatchEvent(new Event('input')); }
+  function osdRun(it, side) {
+    if (!it || it.disabled) return;
+    if (side === 'dec' && it.dec) it.dec(); else if (side === 'inc' && it.inc) it.inc(); else if (it.act) it.act(); else if (it.inc) it.inc();
+    osdDrawn = 0; wake();
+    if (menuOpen) openMenu(true);
+  }
+  // Pointer position on the glass -> position in the menu canvas, through the tube's curvature.
+  function osdPoint(e) {
+    const r = $('crtview').getBoundingClientRect();
+    let lx, ly;
+    if (sonic.rotated) { lx = (e.clientY - r.top) / r.height; ly = 1 - (e.clientX - r.left) / r.width; }
+    else { lx = (e.clientX - r.left) / r.width; ly = (e.clientY - r.top) / r.height; }
+    const [ux, uy] = CRT.curve(lx, 1 - ly);
+    return [ux * osd.canvas.width, (1 - uy) * osd.canvas.height];
+  }
+  // If the GPU drops the CRT's context, swap in a fresh canvas and rebuild on the next frame
+  // instead of leaving a frozen picture on screen.
+  function resetCrt() {
+    const old = $('crtview'), fresh = old.cloneNode(false);
+    old.replaceWith(fresh); crt = null;
+    if (crtOn) { crt = CRT.create(fresh); if (!crt) setCrt(false); }
+  }
+  function setCrt(on) {
+    if (on && !crt) crt = CRT.create($('crtview'));
+    crtOn = on && !!crt;
+    $('crtview').hidden = !crtOn;
+    sonic.setTape(crtOn);
+    $('mask').hidden = !crtOn;
+    cv.style.visibility = crtOn ? 'hidden' : '';
+    for (const id of ['crt', 'hcrt']) {
+      $(id).setAttribute('aria-pressed', String(crtOn));
+      if (on && !crt) { $(id).disabled = true; $(id).title = 'This browser has no WebGL, which the CRT filter needs.'; }
+    }
+  }
+  let world, running = true, rings = [], palette = {}, view = 'life', births = 0;
+  function hsl(h, s, l) {
+    s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+  }
+  // Hues follow birth order, so a tier index reused after an extinction gets a fresh color.
+  function colorOf(T) {
+    const key = T.key ??= (T.idx === 0 ? 0 : ++births);
+    if (palette[key]) return palette[key];
+    // Hue comes from the tier's color family; each tier gets a small shift so siblings stay distinguishable.
+    const fam = [220, 14, 44, 122, 188, 278][T.el], base = T.el === 0;
+    const h = (fam + (key === 0 ? 0 : ((key * 37) % 25) - 12) + 360) % 360;
+    return palette[key] = {
+      live: hsl(h, base ? 22 : 82, base ? 80 : 58 + (key % 3) * 6), dead: hsl(h, base ? 18 : 42, base ? 8 : 10 + (key % 3)),
+      css: `hsl(${h.toFixed(0)} ${base ? 22 : 82}% ${base ? 75 : 60}%)`,
+    };
+  }
+  const famCss = e => e === 0 ? 'hsl(220 22% 75%)' : `hsl(${[220, 14, 44, 122, 188, 278][e]} 82% 64%)`;
+  const SPEEDS = [0.25, 0.5, 1, 2, 3, 4, 6, 8, 10, 12];
+  const params = {};
+  const hl = v => Math.pow(10, +v);
+  const ctl = {
+    speed: v => { const s = SPEEDS[+v]; return [s, s === 0.25 ? '¼×' : s === 0.5 ? '½×' : s + '×']; },
+    margin: v => [v / 100, v + '%'],
+    patience: v => [Math.pow(0.5, 1 / hl(v)), Math.round(hl(v)).toLocaleString() + ' gen'],
+    maxSpeed: v => [v / 100, (v / 100).toFixed(2) + ' c'],
+    crowding: v => [v / 100, v == 0 ? 'off' : v + '%'],
+    mutation: v => [v / 10, v == 0 ? 'off' : (v / 10).toFixed(1) + '×'],
+    spark: v => [v / 100000, v == 0 ? 'off' : (v / 10).toFixed(1) + ' per 10k contacts'],
+    hold: v => [+v, v],
+    hardness: v => [+v, v == 0 ? 'off' : '×' + (1 + +v)],
+    gain: v => [v / 100, v == 0 ? 'off' : v + '%'],
+    forget: v => [Math.pow(0.5, 1 / hl(v)), Math.round(hl(v)).toLocaleString() + ' gen'],
+    noise: v => [v / 10000, (v / 100).toFixed(2) + '%/gen'],
+    memory: v => [Math.pow(0.5, 1 / hl(v)), Math.round(hl(v)).toLocaleString() + ' gen'],
+  };
+  for (const k of Object.keys(ctl)) {
+    const el = $(k), upd = () => { const [val, txt] = ctl[k](el.value); params[k] = val; $(k + 'o').textContent = txt; };
+    el.addEventListener('input', upd); upd();
+  }
+  params.warmup = 300; params.extinction = 200; params.retreat = 400; params.sparkCooldown = 1500; params.reactions = true;
+  $('reactions').addEventListener('click', () => {
+    params.reactions = !params.reactions;
+    $('reactions').textContent = params.reactions ? 'On' : 'Off';
+    $('reactions').setAttribute('aria-pressed', params.reactions);
+  });
+  function newWorld() {
+    [W, H] = sizes()[+$('size').value];
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; img = ctx.createImageData(W, H); }
+    if (fx.width !== W * 5 || fx.height !== H * 5) { fx.width = W * 5; fx.height = H * 5; }
+    if (typeof layout === 'function') layout();
+    if (replay) replay.setShape(W === H);
+    world = new Core.World(W, H, (Math.random() * 2 ** 32) >>> 0);
+    rings = []; palette = {}; births = 0; sonic.reset(); renderLedger();
+  }
+  function handle(ev) {
+    if (!ev || ev.searching) return;
+    sonic.event(ev, world, params);
+    if (ev.tier !== undefined) { const T = world.tiers[ev.tier]; rings.push({ x: ev.x, y: ev.y, t: 0, c: colorOf(T).css, spark: !!T.parents, mutant: T.mutatedFrom != null }); }
+    renderLedger();
+  }
+  let stepAcc = 0;
+  function tick() {
+    // Fractional speeds step the world every second or fourth frame.
+    stepAcc += params.speed;
+    // Large worlds can't always keep up with high speeds; cap the work per frame so the page stays responsive.
+    const t0 = performance.now();
+    while (stepAcc >= 1) {
+      stepAcc -= 1; handle(world.step(params));
+      if (performance.now() - t0 > 28) { stepAcc = 0; break; }
+    }
+    // Rule search tests a few candidates per frame so a birth never freezes the page.
+    handle(world.work(params, 3));
+  }
+  function draw() {
+    const d = img.data, al = world.alive, tr = world.tier, n = W * H;
+    const cols = world.tiers.map(colorOf);
+    if (view === 'life') {
+      for (let i = 0; i < n; i++) {
+        const c = cols[tr[i]], rgb = al[i] ? c.live : c.dead, o = i * 4;
+        d[o] = rgb[0]; d[o + 1] = rgb[1]; d[o + 2] = rgb[2]; d[o + 3] = 255;
+      }
+    } else {
+      // Memory view: amber is acquired resistance to crowding, blue-white is hardened border.
+      const res = world.resist, wall = world.wall, hmax = Math.max(1, params.hardness);
+      for (let i = 0; i < n; i++) {
+        const c = cols[tr[i]].dead, r = res[i], w = Math.min(1, wall[i] / hmax), o = i * 4;
+        d[o] = Math.min(255, c[0] + r * 230 + w * 120);
+        d[o + 1] = Math.min(255, c[1] + r * 150 + w * 170);
+        d[o + 2] = Math.min(255, c[2] + r * 30 + w * 230);
+        d[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    if (crtOn && crt) {
+      const t = performance.now() / 1000;
+      crt.glitchAmt = 0;
+      // On-screen menu: fades with the controls, redrawn about 15 times a second while showing.
+      const showing = osdActive() && (menuOpen || !theater.classList.contains('idle'));
+      theater.classList.toggle('osd', osdActive());
+      crt.osdAmt += ((showing ? 1 : 0) - crt.osdAmt) * 0.25;
+      if (crt.osdAmt > 0.01 && t - osdDrawn > 0.066) {
+        osdList = osdList || osdItems();
+        osd.resize(W, H); osd.rot = sonic.rotated;
+        osd.draw(osdList, { big: 'CH 00', line: `GEN ${String(world.gen).padStart(6, '0')}` }, { menu: menuOpen, bar: barItems(), touch });
+        crt.setOsd(osd.canvas); osdDrawn = t;
+      }
+      crt.render(cv, t);
+      if (crt.lost) resetCrt();
+    }
+    fctx.clearRect(0, 0, fx.width, fx.height);
+    const sx = fx.width / W, sy = fx.height / H;
+    rings = rings.filter(r => r.t < 90);
+    for (const r of rings) r.t++;
+    for (const r of markers ? rings : []) {
+      fctx.globalAlpha = Math.max(0, 1 - r.t / 90);
+      fctx.strokeStyle = r.c; fctx.lineWidth = 2;
+      const rad = (reduce ? 14 : 6 + r.t * 1.6) * sx;
+      fctx.setLineDash(r.mutant ? [2, 5] : []);
+      fctx.beginPath(); fctx.arc((r.x + 0.5) * sx, (r.y + 0.5) * sy, rad, 0, Math.PI * 2); fctx.stroke();
+      fctx.setLineDash([]);
+      if (r.spark) { fctx.beginPath(); fctx.arc((r.x + 0.5) * sx, (r.y + 0.5) * sy, rad * 0.6, 0, Math.PI * 2); fctx.stroke(); }
+    }
+    fctx.globalAlpha = 1;
+    if (markers && world.search) {
+      const S = world.search;
+      fctx.setLineDash([4, 4]); fctx.strokeStyle = 'rgba(242,184,75,0.85)'; fctx.lineWidth = 1.5;
+      fctx.beginPath(); fctx.arc((S.cx + 0.5) * sx, (S.cy + 0.5) * sy, 7 * sx, 0, Math.PI * 2); fctx.stroke();
+      fctx.setLineDash([]);
+    }
+    // Recorder copy of exactly what is on screen (CRT included, markers if shown).
+    if (replay.busy) {
+      replay.tick(sonic.recordStream());
+      replay.frame(crtOn && crt ? $('crtview') : cv, crtOn && !!crt, markers ? fx : null);
+    }
+    if (replay.keeper) {
+      const t = Math.floor(replay.elapsed()), lab = `Stop ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+      if ($('rec').textContent !== lab) { $('rec').textContent = lab; $('hrec').textContent = '■ ' + lab.slice(5); $('rectime').textContent = lab.slice(5); }
+    }
+    $('recdot').hidden = !replay.keeper;
+    $('gen').textContent = world.gen.toLocaleString();
+    $('ftier').textContent = world.frontier;
+    $('fage').textContent = world.frontierAge.toLocaleString();
+    $('fext').textContent = world.extinct.length;
+    $('factive').textContent = world.active;
+    $('hgen').textContent = world.gen.toLocaleString(); $('htier').textContent = world.frontier;
+    const quiet = world.gen - world.lastBirth;
+    $('quiet').textContent = quiet.toLocaleString();
+    $('typical').textContent = Math.round(world.meanEpoch).toLocaleString();
+    $('qfill').style.width = Math.min(100, 50 * quiet / world.meanEpoch) + '%';
+    if (world.reignTier) {
+      const R = world.reignTier, reign = world.gen - world.reignStart;
+      $('rname').textContent = `Tier ${R.idx}`; $('rname').style.color = colorOf(R).css;
+      $('reign').textContent = reign.toLocaleString();
+      $('rfill').style.width = Math.min(100, 50 * reign / world.meanEpoch) + '%';
+    }
+    const warm = world.frontierAge <= world.warm;
+    const thr = world.record * (1 + params.margin), now = world.lastMax, top = Math.max(thr, now) * 1.15 || 1;
+    $('mfill').style.width = (100 * now / top) + '%';
+    $('mmark').style.left = (100 * thr / top) + '%';
+    $('snow').textContent = now.toFixed(0);
+    $('sthr').textContent = world.retreat ? 'paused during retreat' : world.search ? `testing rules (${world.search.tries})` : warm ? 'warming up' : thr.toFixed(0);
+    for (const el of $('ledger').children) {
+      const T = el._tier;
+      el.querySelector('.cov div').style.width = (el.classList.contains('extinct') ? 0 : 100 * T.cells / n).toFixed(1) + '%';
+    }
+  }
+  function renderLedger() {
+    const L = $('ledger'); L.textContent = '';
+    const entries = [...world.tiers.map(T => [T, false]), ...world.extinct.map(T => [T, true])].sort((a, b) => b[0].gen - a[0].gen);
+    for (const [T, dead] of entries) {
+      const c = colorOf(T), el = document.createElement('div');
+      el.className = 'tier' + (dead ? ' extinct' : T.dying ? ' dying' : T.idx === world.frontier ? ' frontier' : '');
+      const born = T.idx === 0 ? 'origin · Conway\'s Life' : T.mutatedFrom != null
+        ? `gen ${T.gen.toLocaleString()} · mutated from tier ${T.mutatedFrom} ${T.reign.toLocaleString()} gen into its reign · invades at ${T.speed.toFixed(2)} c`
+        : T.parents
+        ? `gen ${T.gen.toLocaleString()} · sparked where tier ${T.parents[0]} met tier ${T.parents[1]} · invades at ${T.speed.toFixed(2)} c`
+        : `gen ${T.gen.toLocaleString()} at (${T.origin[0]}, ${T.origin[1]}) · ${T.surprise.toFixed(0)} bits · invades at ${T.speed.toFixed(2)} c`;
+      const meta = `${Core.ELEMENTS[T.el]} · ${born}` + (dead ? ` · extinct gen ${T.extinctAt.toLocaleString()}` : '');
+      const verbs = { [Core.PUSH]: 'pushes back', [Core.FEED]: 'feeds on', [Core.SPARK]: 'sparks with' };
+      const groups = {};
+      T.react.forEach((r, e) => { if (r) (groups[r] ??= []).push(e); });
+      const reacts = Object.keys(groups).map(r => `${verbs[r]} ${groups[r].map(e => `<span class="elx" style="color:${famCss(e)}">${Core.ELEMENTS[e]}</span>`).join(', ')}`).join(' · ');
+      el.innerHTML = `<span class="sw" style="background:${c.css}"></span><span class="name">Tier ${T.idx}</span><span class="rule">${Core.ruleStr(T.rule)}</span><span class="meta">${meta}</span>${reacts ? `<span class="meta reacts">${reacts}</span>` : ''}<span class="cov"><div style="background:${c.css};width:0"></div></span>`;
+      el._tier = T;
+      L.appendChild(el);
+    }
+  }
+  function setView(v) {
+    view = v;
+    $('vlife').classList.toggle('on', v === 'life'); $('vlife').setAttribute('aria-pressed', v === 'life');
+    $('vmem').classList.toggle('on', v === 'mem'); $('vmem').setAttribute('aria-pressed', v === 'mem');
+    $('vhint').textContent = v === 'life' ? 'Bright cells are alive. The tint shows which tier\'s rule governs each site.'
+      : 'Amber marks sites resisting a crowding count that recently killed them. Blue-white marks border ground hardened under pressure.';
+  }
+  function loop() { if (running) tick(); draw(); sonic.update(world, params); requestAnimationFrame(loop); }
+  let soundOn = false;
+  function toggleSound() {
+    soundOn = !soundOn;
+    if (soundOn) sonic.start(); else sonic.stop();
+    const on = soundOn;
+    for (const id of ['sound', 'hsound']) { $(id).textContent = on ? 'Sound off' : 'Sound on'; $(id).setAttribute('aria-pressed', String(on)); }
+  }
+  $('sound').addEventListener('click', toggleSound);
+  $('hsound').addEventListener('click', toggleSound);
+  function setRunning(r) {
+    running = r;
+    for (const id of ['run', 'hrun']) $(id).textContent = running ? 'Pause' : 'Run';
+  }
+  $('hrun').addEventListener('click', () => setRunning(!running));
+  function nudgeSpeed(d) {
+    const el = $('speed'); el.value = Math.max(0, Math.min(9, +el.value + d)); el.dispatchEvent(new Event('input'));
+  }
+  $('hslower').addEventListener('click', () => nudgeSpeed(-1));
+  $('hfaster').addEventListener('click', () => nudgeSpeed(1));
+  $('speed').addEventListener('input', () => { $('hspeed').textContent = $('speedo').textContent; });
+  $('hspeed').textContent = $('speedo').textContent;
+  // Full screen: the browser's own full screen where allowed, otherwise the box fills the window.
+  const theater = $('theater');
+  let idleTimer = 0;
+  function wake() {
+    theater.classList.remove('idle'); clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (isFull()) theater.classList.add('idle'); }, 2500);
+  }
+  // The box is always laid out by the 'on' class. Browser full screen, where allowed, is requested
+  // for the whole page rather than for the box itself, which keeps the WebGL canvas out of the
+  // browser's special full-screen layer and lets exit restore the page cleanly.
+  let apiFull = false;
+  function isFull() { return theater.classList.contains('on'); }
+  // In full screen the box is sized to the screen. On a portrait screen it turns 90° so the world's
+  // long side runs along the screen's long side. Fit shows the whole world; Fill covers the screen
+  // and crops the edges of the torus.
+  const box = theater.querySelector('.canvas-box');
+  let fillMode = false;
+  function layout() {
+    if (!isFull()) { box.style.cssText = `aspect-ratio:${W} / ${H};width:min(100%, calc(78vh * ${W} / ${H}))`; sonic.rotated = false; return; }
+    const vw = theater.clientWidth, vh = theater.clientHeight, a = W / H;
+    const rot = vh > vw && W > H;
+    const sw = rot ? vh : vw, sh = rot ? vw : vh;
+    const w = (fillMode ? Math.max : Math.min)(sw, sh * a), h = w / a;
+    box.style.cssText = `position:absolute;left:50%;top:50%;width:${w}px;height:${h}px;max-width:none;aspect-ratio:auto;` +
+      `border:0;border-radius:0;transform:translate(-50%,-50%)${rot ? ' rotate(90deg)' : ''}`;
+    sonic.rotated = rot;
+  }
+  addEventListener('resize', layout);
+  addEventListener('orientationchange', () => setTimeout(layout, 250));
+  $('hfill').addEventListener('click', () => {
+    fillMode = !fillMode;
+    $('hfill').textContent = fillMode ? 'Fit' : 'Fill';
+    $('hfill').setAttribute('aria-label', fillMode ? 'Show the whole world' : 'Fill the screen');
+    layout();
+  });
+  function enterFull() {
+    theater.classList.add('on');
+    layout(); wake();
+    // iPhone browsers have no page full screen; there the box simply fills the window.
+    const root = document.documentElement;
+    try {
+      const p = root.requestFullscreen ? root.requestFullscreen() : null;
+      if (p && p.then) p.then(() => { apiFull = true; layout(); }, () => {});
+    } catch (e) {}
+  }
+  function exitFull() {
+    clearTimeout(idleTimer);
+    if (crt && crtOn) $('crtview').width = 1; // rebuild the CRT buffer at the new size right away
+    theater.classList.remove('on', 'idle');
+    layout();
+    if (document.fullscreenElement) { apiFull = false; document.exitFullscreen().catch(() => {}); }
+  }
+  $('full').addEventListener('click', enterFull);
+  $('hexit').addEventListener('click', exitFull);
+  // Capture: an optional rolling buffer, and Record/Stop. Saving goes through the viewer's
+  // download prompt; where that isn't available the finished clip is shown to save by hand.
+  function setBuffer(on) {
+    replay.arm(on);
+    $('buffer').setAttribute('aria-pressed', String(on));
+    $('rechint').textContent = on
+      ? 'Holding the last 15–20 seconds. Record starts from that far back.'
+      : 'Record starts from now. Turn on "Keep last 15 s" to start from 15–20 seconds earlier.';
+  }
+  async function toggleRecord() {
+    if (!replay.keeper) {
+      const back = replay.start(sonic.recordStream());
+      $('rec').classList.add('live'); $('hrec').classList.add('live');
+      $('rechint').textContent = back >= 1 ? `Recording, including ${Math.round(back)} s from before you pressed Record.` : 'Recording.';
+      return;
+    }
+    $('rec').disabled = $('hrec').disabled = true;
+    const blob = await replay.stop();
+    $('rec').disabled = $('hrec').disabled = false;
+    $('rec').classList.remove('live'); $('hrec').classList.remove('live');
+    $('rec').textContent = 'Record'; $('hrec').textContent = '● Rec';
+    setBuffer($('buffer').getAttribute('aria-pressed') === 'true');
+    if (blob && blob.size) offerClip(blob);
+  }
+  async function offerClip(blob) {
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const filename = `culture-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.${replay.ext}`;
+    const mb = (blob.size / 1048576).toFixed(1);
+    let downloads = null;
+    try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) {}
+    if (downloads) {
+      try { await downloads.save({ filename, data: blob }); $('rechint').textContent = `Saved ${filename} (${mb} MB).`; return; }
+      catch (e) {
+        if (e && e.code === 'declined') { $('rechint').textContent = 'Not saved.'; return; }
+      }
+    }
+    // Outside the Claude viewer (e.g. on your own site) an ordinary download link works.
+    if (!(window.claude && window.claude.use)) {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      $('rechint').textContent = `Saved ${filename} (${mb} MB).`;
+      return;
+    }
+    // Fallback: show the clip so it can be saved from the video's own menu.
+    const v = $('clip'); v.src = URL.createObjectURL(blob); $('clipwrap').hidden = false;
+    $('rechint').textContent = `Clip ready (${mb} MB). Saving isn't available in this view; use the video's menu to save it.`;
+  }
+  if (!replay.supported) {
+    for (const id of ['buffer', 'rec', 'hrec']) $(id).disabled = true;
+    $('rechint').textContent = 'This browser cannot record video from the page.';
+  } else {
+    replay.setShape(W === H);
+    setBuffer(false);
+  }
+  $('buffer').addEventListener('click', () => setBuffer($('buffer').getAttribute('aria-pressed') !== 'true'));
+  $('rec').addEventListener('click', toggleRecord);
+  $('hrec').addEventListener('click', () => { toggleRecord(); wake(); });
+  $('clipclose').addEventListener('click', () => { $('clipwrap').hidden = true; URL.revokeObjectURL($('clip').src); $('clip').removeAttribute('src'); });
+  $('crt').addEventListener('click', () => setCrt(!crtOn));
+  const MASKS = ['Grille', 'Slot', 'Dots'];
+  function cycleMask(d) {
+    if (!crt) return;
+    crt.maskType = (crt.maskType + d + 3) % 3;
+    $('mask').textContent = 'Mask: ' + MASKS[crt.maskType];
+  }
+  $('mask').addEventListener('click', () => cycleMask(1));
+  $('hcrt').addEventListener('click', () => { setCrt(!crtOn); wake(); });
+  function stepSize(d) {
+    const el = $('size'), v = Math.max(0, Math.min(4, +el.value + d));
+    if (v === +el.value) return;
+    el.value = v; showSize(); newWorld(); wake();
+  }
+  $('hsizedown').addEventListener('click', () => stepSize(-1));
+  $('hsizeup').addEventListener('click', () => stepSize(1));
+  $('hforce').addEventListener('click', () => { handle(world.forceEmerge(params)); wake(); });
+  $('hreset').addEventListener('click', () => { newWorld(); layout(); wake(); });
+  theater.addEventListener('pointermove', () => { if (isFull()) wake(); });
+  theater.addEventListener('pointerdown', () => {
+    wokeFromIdle = theater.classList.contains('idle');
+    if (isFull()) wake(); // a tap brings the controls back on touch screens
+  });
+  // On-screen menu: hover selects, a click or tap acts (left or right half of a value adjusts).
+  theater.addEventListener('pointermove', e => {
+    if (!osdActive() || !menuOpen || e.pointerType === 'touch') return;
+    const h = osd.hit(...osdPoint(e));
+    if (h && h.i !== osd.sel) { osd.sel = h.i; osdDrawn = 0; }
+  });
+  theater.addEventListener('click', e => {
+    if (!osdActive() || e.target.closest('.hud')) return;
+    const pt = osdPoint(e);
+    if (menuOpen) {
+      const h = osd.hit(...pt);
+      if (h) { osd.sel = h.i; osdRun(osdList[h.i], h.side); } else openMenu(false); // a click outside the box closes it
+      return;
+    }
+    if (wokeFromIdle) return; // that tap only brought the strip back
+    const b = osd.hitBar(...pt);
+    if (b && !b.disabled) { b.act(); osdDrawn = 0; }
+  });
+  // Leaving browser full screen by its own means (Esc, the system button) also leaves our view.
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && apiFull) { apiFull = false; exitFull(); }
+    else layout();
+  });
+  document.addEventListener('keydown', e => {
+    // E emerges, R starts or stops recording, S switches sound. None of them wakes the controls or the on-screen menu,
+    // so they can be used mid-take without anything appearing on screen.
+    const typing = e.target.closest && e.target.closest('textarea, select, input:not([type=range])');
+    if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && !e.repeat) {
+      if (e.key === 'e' || e.key === 'E') { e.preventDefault(); handle(world.forceEmerge(params)); return; }
+      if ((e.key === 'r' || e.key === 'R') && replay.supported) { e.preventDefault(); toggleRecord(); return; }
+      if (e.key === 's' || e.key === 'S') { e.preventDefault(); toggleSound(); osdDrawn = 0; return; }
+    }
+    if (osdActive() && !typing && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); openMenu(!menuOpen); return; }
+    if (osdActive() && menuOpen && e.key === 'Escape') { e.preventDefault(); openMenu(false); return; }
+    if (osdActive() && menuOpen && osdList && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
+      e.preventDefault(); wake(); osdDrawn = 0;
+      const n = osdList.length, it = osdList[osd.sel];
+      if (e.key === 'ArrowUp') osd.sel = (osd.sel + n - 1) % n;
+      else if (e.key === 'ArrowDown') osd.sel = (osd.sel + 1) % n;
+      else osdRun(it, e.key === 'ArrowLeft' ? 'dec' : e.key === 'ArrowRight' ? 'inc' : null);
+      return;
+    }
+    if (e.target.closest && e.target.closest('input, button, textarea, select')) { if (e.key !== 'Escape') return; }
+    if (e.key === 'f' || e.key === 'F') { isFull() ? exitFull() : enterFull(); }
+    else if (e.key === 'Escape' && isFull()) exitFull();
+    else if (e.key === ' ') { e.preventDefault(); setRunning(!running); if (isFull()) wake(); }
+  });
+  $('volume').addEventListener('input', () => { const v = $('volume').value / 100; sonic.setVolume(v * v); $('volumeo').textContent = $('volume').value + '%'; });
+  sonic.setVolume(0.49); $('volumeo').textContent = '70%';
+  $('run').addEventListener('click', () => setRunning(!running));
+  $('step').addEventListener('click', () => { setRunning(false); handle(world.step(params)); handle(world.work(params, 3)); });
+  $('force').addEventListener('click', () => handle(world.forceEmerge(params)));
+  $('reset').addEventListener('click', newWorld);
+  const showSize = () => {
+    const [w, h] = sizes()[+$('size').value];
+    $('sizeo').textContent = `${w} × ${h}`; $('hsizeo').textContent = `${w}×${h}`;
+    $('hsizedown').disabled = +$('size').value === 0; $('hsizeup').disabled = +$('size').value === 4;
+  };
+  function setShape(s) {
+    shape = s;
+    for (const [id, v] of [['shapeWide', 'wide'], ['shapeSquare', 'square']]) $(id).setAttribute('aria-pressed', String(v === s));
+    showSize(); newWorld();
+  }
+  $('shapeWide').addEventListener('click', () => { if (shape !== 'wide') setShape('wide'); });
+  $('shapeSquare').addEventListener('click', () => { if (shape !== 'square') setShape('square'); });
+  $('size').addEventListener('input', showSize);
+  $('size').addEventListener('change', newWorld);
+  showSize();
+  $('vlife').addEventListener('click', () => setView('life'));
+  $('vmem').addEventListener('click', () => setView('mem'));
+  $('markers').addEventListener('click', () => {
+    markers = !markers;
+    $('markers').classList.toggle('on', markers); $('markers').setAttribute('aria-pressed', String(markers));
+  });
+  newWorld(); loop();
+})();
+</script>
+</body>
+</html>
