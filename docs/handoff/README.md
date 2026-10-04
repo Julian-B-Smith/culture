@@ -17,12 +17,15 @@ README.md          this file, including the kickoff prompt
 BRIEF.md           vision, current state, spin-up questions, ground rules
 SPEC.md            exact simulation spec, parameters, RNG order, known quirks
 SOUND.md           sonification spec and port notes
-DECISIONS.md       seed decision log D-001 … D-019
+DECISIONS.md       seed decision log D-001 … D-019; prototype decisions P-020 … P-035 (renumbered on import, D-036)
 PORT_PLAN.md       phases 0–5 with acceptance criteria
 reference/
   culture.html     the full browser prototype, one self-contained file; open it in a browser
   core.js          deterministic simulation core (Node-loadable: require('./core.js'))
   sound.js         Web Audio sonification
+  recorder.js      replay recorder: rolling encoders so Record can start 15–20 s in the past
+  crt.js           optional CRT look: two-pass WebGL filter (phosphor persistence; then beam, phosphor mask, glow, curvature)
+  osd.js           on-screen television menu, drawn into the CRT picture in full screen
   ui.js            browser shell
 tools/
   golden.js        regenerate golden traces:  node tools/golden.js [--profile default|stress] [--out dir] [seed…]

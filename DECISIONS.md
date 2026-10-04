@@ -192,3 +192,73 @@ All hold 60 fps at target speed.
 
 **D-035: Search latency stays at L = 30 (2026-10-03, human decision by poll).**
 Resolves the question D-034 left open. L is counted in generations: it gives 500 ms of slack at 1× but only 31 ms at 16×, where long searches can still stall the viewer (154 ms measured). Kept at 30: births stay close to the surprise that caused them, and the stalls only affect 8–16×. Rejected: L = 120 (changes which world a seed produces in live play); L as a viewer option (deferred, though the core already takes L as a parameter).
+
+---
+
+## Prototype decisions v2–v3 (handoff v3 packet, 2026-10-04)
+
+Recorded by the human while evolving the JS prototype, after this repo's own
+log had already used D-020 to D-035. To keep every D-number unambiguous they
+are imported verbatim here as **P-020…P-035**: P-0nn is the packet's D-0nn.
+They concern presentation only (view, sound, recording, controls); the
+packet's core.js and goldens are byte-identical to this repo's. Where packet
+docs cite them, the citation now reads P-0nn (docs/handoff/, D-036).
+
+**P-020: Full screen fills phones in either orientation.**
+In full screen the box is sized to the screen. On a portrait screen it is turned 90° so the world's long side runs along the screen's long side, and the stereo mapping turns with it so the sound still matches what is on screen. A Fit/Fill toggle chooses between showing the whole world (letterboxed) and covering the screen (cropping the torus edges). iPhone browsers have no element full-screen API, so there the box fills the window or the artifact viewer instead. View-only change: the core and golden traces are unaffected.
+
+**P-021: Lighter audio on phones.**
+The user heard clicks on a phone but not on a laptop: audio-thread underruns on a busier, weaker device. The engine now requests larger audio buffers (`latencyHint: 'playback'`) everywhere, since an ambient piece doesn't need low latency. On touch devices it also caps voices at 6, uses a 3.5 s reverb impulse instead of 6.5 s, and updates parameters at 10 Hz instead of 15. Not yet confirmed by ear on the phone.
+
+**P-022: Sharing defaults.**
+So that people seeing it for the first time aren't confused, the prototype now opens with markers off and the world at 330×210 (440×280 was tried first and stepped down one size for phones). View defaults only; the golden traces still use 220×140.
+
+**P-023: Optional CRT filter.**
+A toggle renders the world through a cheap two-pass WebGL filter. Pass 1, at world resolution: phosphor persistence (each cell keeps the brighter of its new color and 0.42× last frame's). Pass 2, at screen resolution: barrel curvature, slight color fringing, bloom, one scanline per world row (faded out when rows are too small on screen), an aperture-grille mask, vignette, grain and faint flicker. Off by default. View only; the port's renderer can reuse the same two passes.
+
+**P-024: Full screen is requested for the whole page, not the box.**
+On the user's computer, leaving full screen left a frozen, unclickable full-screen image. The box is now always laid out by the page's own full-screen styling, and browser full screen is requested for the document root rather than the box element. Leaving browser full screen by any route (Esc, system button) also leaves the page's full-screen view, and the hide-controls timer can no longer fire after exit. Fix not yet confirmed on the user's machine.
+
+**P-025: Square worlds.**
+A Wide/Square shape choice. Square sizes (132² to 440²) match the wide sizes' cell counts. Full screen never rotates a square world. Changing shape starts a new world.
+
+**P-026: Replay recorder.**
+The user's idea, borrowed from high-speed nature photography: hold the recent past so you never have to anticipate an event. With "Keep last 15 s" on, a new MediaRecorder starts every 5 s (7.5 s on touch devices) on an offscreen copy of the view (CRT and markers included, plus the sound mix), and old ones are dropped, so one encoder has always been running for 15–20 s. Record keeps that encoder and discards the rest; Stop finalizes it into one MP4 or WebM, offered through the viewer's download prompt (the `downloads` capability), or shown in a video player where that isn't available. Output is 1920 px wide or 1080² (1280 / 720² on touch). Each encoder writes a complete file, so no trimming or remuxing is needed, at the cost of the backlog being 15–20 s rather than exactly 15. In the port, a true ring buffer of encoded frames (keyframe every second) can make it exact.
+
+**P-027: CRT rebuilt around a beam model.**
+The user found the first CRT pass unconvincing. Causes: a faint mask (off-stripes only dimmed to 72%), fixed scanlines, math done on display values instead of linear light, and generic linear smoothing. The screen pass now works in linear light (gamma 2.2 in and out); each world row is a beam whose vertical gaussian widens with brightness (bright rows swell into the gaps, dim rows stay thin); cells blend horizontally with a gaussian spot; the phosphor mask is strong (off-channels at 18%, compensated after) with three layouts: Trinitron grille, TV slot (default) and monitor dots; slot breaks are aligned to scanline gaps to avoid beating; an unmasked glow is added after the mask. The mask is laid out in the picture's own curved cell coordinates with a whole number of triads per cell (one at the default size) and slot breaks on the row gaps; an earlier screen-pixel mask beat against the cell pitch and drifted off the rows toward the curved edges. Below about 3 screen pixels per cell the mask fades out. Note for the port: `flat` is a reserved word in GLSL ES and silently disabled the filter once.
+
+**P-028: VCR layer, tied to the CRT view.**
+The user asked for tape artifacts in the sound, only while CRT is on, plus anything that adds fidelity. Sound: a crossfaded tape path (band limits, head bump, saturation, wow and flutter, narrowed stereo, hiss, faint hum; see SOUND.md). Picture: a slight per-row timebase wobble, head-switching skew in the bottom rows, and dropouts every 8–30 s that tear a band of the picture and dip the sound at the same moment. All view and audio only; the simulation is untouched.
+
+**P-029: Size in the full-screen controls; full-screen exit hardened again.**
+Full-screen controls gained world size ◂ ▸ (starts a new world). The user still saw stuck screens after leaving full screen, which could not be reproduced here (four enter/exit cycles left the page clean and clickable). Hardening: the CRT's drawing buffer now resizes only after the on-screen size holds still for 8 frames, instead of every frame through a full-screen transition; old GPU buffers are deleted when the world size changes (they leaked before); a lost GPU context swaps in a fresh canvas instead of leaving a frozen picture; on exit the CRT buffer is rebuilt immediately at the new size.
+
+**P-030: CRT on-screen menu.**
+With CRT on in full screen, the controls become a 1990s-television on-screen menu: a blocky VT323 list in a translucent blue box, the selected row in inverse, ‹ › adjusters and a volume bar, plus a channel-style readout ("CH 00", fixed, and the GEN counter). It is drawn to its own canvas and composited in the CRT shader before the phosphor mask, so it gets the tube's curvature, scanlines and phosphors. Pointer hits are mapped through the same barrel curve (and the 90° turn on portrait screens); arrow keys and Enter work like a remote. The ordinary controls bar is hidden while it is active and returns when CRT is off. If the menu is awake during a recording, it is recorded too.
+
+**P-031: Silent hotkeys.**
+E forces an emergence and R starts or stops recording, without waking the controls or the on-screen menu, so they can be used mid-take. A blinking camcorder-style "● REC 0:00" tally shows while recording; it is a page overlay and never appears in the recorded video.
+
+**P-032: The menu opens on M; movement shows a hint strip.**
+In CRT full screen, moving the mouse or tapping no longer opens the menu box. It brings up a strip of green VCR lettering along the bottom (PLAY ▶, E EMERGE, R REC, M MENU, F EXIT), each entry clickable. The menu opens on M or its strip entry, closes on M, Esc, a click outside it, or after 10 s idle, like a television's. On touch screens the strip drops the key letters, uses larger lettering and wraps to two lines; the menu box widens to nearly the full screen width; and on an upright phone (picture turned 90°) all menu text is drawn turned back so it reads upright. Also fixed: the REC tally could show on pages without a global [hidden] rule.
+
+**P-033: S for sound.**
+S switches sound on or off without waking the controls, like E and R. The hint strip gains "S SOUND ON/OFF" (SOUND ON/OFF on touch screens).
+
+**P-034: Dropouts off, gentler curvature; prototype signed off.**
+The shared picture-and-sound tape dropouts were authentic but too distracting in practice, so they no longer fire (the code paths remain for a future "worn tape" setting). The tube's barrel curvature was reduced by about a third (0.055/0.075 → 0.035/0.05), with the pointer-mapping curve changed to match. The user considers the prototype ready to share.
+
+**P-035: The hint strip doesn't move when states change.**
+Toggling sound changed SOUND OFF to SOUND ON, and that one character decided whether the strip wrapped to a second line. Each entry now has a fixed slot sized for its longest wording (PAUSE/PLAY, REC/STOP, SOUND OFF/ON), with the text centred in it. With a keyboard the strip always stays on one line, shrinking its lettering to fit if needed; on touch screens it wraps at a stable point (three and three).
+
+**D-036: Handoff v3 imported; the v3 prototype is the presentation reference (2026-10-04, human decisions by poll).**
+The human evolved the prototype (v2, then v3) and supplied `culture-handoff_v3.zip`. Triage against the repo:
+- **Byte-identical, so no impact on the canonical C++, the oracle or D-031:** `core.js`, all four goldens, `golden.js`, `compare.js`, SPEC, PORT_PLAN.
+- **Changed:** the v3 presentation modules, BRIEF/README (decision range, module list) and SOUND.md (the tape path, portrait stereo mapping, a phone-clicks note), plus the 16 decisions above.
+Decided:
+- v3's `reference/` files go to **`reference/v3/`**, frozen and sha256-pinned, as the presentation reference for P2 and P3. `core.js` is not duplicated, since it is identical to `reference/core.js` (sha256 equal). v1 stays as the v0 snapshot.
+- `docs/handoff/` BRIEF, README and SOUND are updated to the v3 packet as received (git keeps v1). One edit: SOUND.md's "see D-034" now reads P-034, and BRIEF/README's "D-001 to D-035" note the P-series.
+- The packet's decisions are imported as P-020…P-035.
+- The superseded local files are deleted after byte-identity checks: `culture_v2.html` (superseded by v3), `culture_v3.html` (= `reference/v3/culture.html`), `culture-handoff_v3.zip` (contents imported or identical), and the original `culture-handoff/` and `Culture.html` (v1, in git and tag `v0-js-parity`). Their `.gitignore` lines go too.
+Next, by the same poll: bring v3's presentation to the dev viewer, over the canonical core.

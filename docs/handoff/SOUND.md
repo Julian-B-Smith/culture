@@ -50,6 +50,7 @@ Because each step comes from the tier's hash, the tuning wanders and does not re
 | Wall hardening / territory | Comb feedback: `0.15 + 0.75·min(1, wall/max(0.5, hardness))`, capped at 0.88, so entrenched frontiers ring |
 | Circular mean of live cells in x | Stereo position. With mean x fraction fx and resultant length R: `focus = min(1, 2.2·R)`, `pos = (2·fx − 1)·focus`, `width = 0.06 + 0.9·(1 − focus)`. A pans to pos − width, B to pos + width, the comb to pos |
 | Circular mean of live cells in y | Distance: top of the box is far (more reverb send, less direct, darker), bottom is near |
+| Full screen on a portrait screen | The box is drawn turned 90° clockwise, and the mapping follows the screen: pan comes from world y (screen left = world bottom), distance from world x (screen top = world left) |
 
 ## Event gestures
 
@@ -61,6 +62,17 @@ Because each step comes from the tier's hash, the tuning wanders and does not re
 | Retreat (`dying`) | Sinks an octave over the retreat's duration and is attenuated; retired when extinct |
 | Surprise approaching threshold | Bandpassed noise riser. With `r = lastMax/(record·(1+margin))` (note: without the crowding `thresholdLift`) and `t = clamp((r − 0.55)/0.45)`: gain `0.05·t²`, center `250 + 3800·t²` Hz. When the frontier is still warming up or a retreat is running, r is 1 if a search is pending and 0 otherwise |
 | Quiet past the typical epoch | Bus gain × `(1 − 0.45·over)`, far bus × `(1 − 0.3·over)`, reverb wet `0.7 + 0.5·over`, where over = gap/meanEpoch − 1, clamped to 0–1 |
+
+## Tape (only while the CRT view is on)
+
+Crossfaded in over ~0.15 s between the compressor and the master gain. Linear-track VHS character:
+- highpass 55 Hz, head-bump peak +2.5 dB at 95 Hz
+- tanh saturation, drive 1.8, 2× oversampled
+- wow and flutter: an 8 ms delay whose time is modulated by 0.55 Hz (±1.1 ms), 7.3 Hz (±0.09 ms) and 0.13 Hz (±0.7 ms) sines
+- lowpass 9 kHz then 11 kHz
+- stereo narrowed to 82/18 crossfeed
+- hiss (noise, 1.8–8.5 kHz, gain 0.0045) and mains hum (60 Hz at 0.0012, 180 Hz at 0.0005)
+- dropouts: built (`dropout()` in sound.js, `glitchY`/`glitchAmt` in the CRT shader) but switched off; see P-034
 
 ## Master
 
@@ -78,6 +90,7 @@ Bus → dry (0.55) and convolution reverb (a generated 6.5 s stereo decaying-noi
 - **Click hazards already found:**
   - Cancelling scheduled automation snapped gains back to old values. Fade from the current value instead.
   - Per-frame automation across hundreds of nodes overloaded the audio thread. Update at about 15 Hz and keep the voice cap.
+- **Phones click where laptops don't.** The audio thread misses deadlines when the device is busy. The reference asks for `latencyHint: 'playback'` (larger buffers) everywhere and, on touch devices, caps voices at 6, shortens the reverb impulse to 3.5 s and updates parameters at 10 Hz. In the port, size the audio buffer generously and keep the audio thread's work bounded per block.
 - **Voice identity.** Tier indices are reused after extinction (SPEC §8, quirk 8). Key voices by tier object or a unique birth ID, not by index.
 - **Known untuned spots, to judge by ear:**
   - Register: 65–260 Hz gets muddy with five or more voices. Consider a wider fold or a per-family octave.

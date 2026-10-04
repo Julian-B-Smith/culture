@@ -54,6 +54,7 @@ Current phase and acceptance criteria: [ROADMAP.md](ROADMAP.md).
 | Path | What |
 |---|---|
 | `reference/` | frozen v0 browser prototype: `core.js`, `sound.js`, `ui.js`, `culture.html` |
+| `reference/v3/` | frozen v3 prototype, the presentation reference (CRT, on-screen menu, recorder, tape sound; D-036). Same core as v0 |
 | `core/` | `libculture`, the canonical simulation; `core/ref/` is the frozen naive core |
 | `golden/` | C++ golden traces, `deep/` hidden-state goldens, `js-v1/` archived JS goldens, `PINS.sha256` (protected) |
 | `tools/` | `compare.js` (check a trace against a golden); `golden.js` (frozen JS generator) |
