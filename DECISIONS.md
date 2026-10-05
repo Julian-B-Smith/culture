@@ -377,3 +377,13 @@ Decided:
 (2) **Port Spores now:** `emergeAt` in `core/` and `core/ref/` in one commit, `culture_trace --inputs`, and a C++ input-log golden and deep golden pinned for both cores. The existing goldens must not move. User-made tiers are marked by birth serial (D-031 #8).
 (3) **P3's reference is the v6 sound layer:** timbres, rhythm and conductor, drums on a ducked bus, ear-model stereo, a VHS switch (SOUND.md, P-043…P-046, P-050). The port adds a seeded RNG for the sound layer, separate from the core's, so offline renders are bit-reproducible. This supersedes D-033's v0 reference for the sign-off.
 (4) **The dev-viewer plan** (run the prototype's own UI on the C++ core) **retargets from v3 to v6.** It comes after the Spores port, which v6's UI needs.
+
+**D-038: Spores ported to the C++ cores (2026-10-05; ROADMAP P1b, per D-037).**
+`World::emergeAt(x, y, p)` in `core/` and `core/ref/` (one commit) follows SPEC §10: wrap onto the torus; refuse while a search is pending or a retreat runs; otherwise `emerge(y·W + x, lastMax, …)`. The spending budget, the switch and the made-by-user mark stay shell state; a shell marks user-made tiers by birth serial (D-031 #8).
+`culture_trace --inputs run.json` replays an input log with `reference/v6/tools/golden.js` semantics: inputs apply before the next step, accepted searches settle at once, and refusals are logged. The event JSON uses the same key order, so `compare.js` reads both.
+**Evidence:**
+- Existing goldens and deep goldens are unchanged.
+- The C++ replay of `reference/v6/golden/run-seed-7.json` against the JS replay golden: identical input events, identical births (8, including two spores and a force), and identical alive/tier grids and cells for all 3000 gens. Only the surprise fields differ from gen 3, which is D-031's wrapped window picking an edge-band site that v0 never could.
+- Pinned: `golden/default-seed-7-inputs.jsonl` (C++) and `golden/deep/default-seed-7-inputs.txt`, with the optimized and naive cores equal.
+- Property `spores`: wraps (-1, 145) to (219, 5), and refuses while searching and during a retreat (cases the log never hits).
+- Plants: a spore one cell off turns `cpp_inputs` red at gen 401 and deep[opt] red while deep[ref] stays green; removing the search refusal turns `spores` red.

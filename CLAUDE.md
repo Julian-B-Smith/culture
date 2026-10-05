@@ -112,14 +112,16 @@ double rounding and breaks parity.
 `tools/`, the frozen JS set (`reference/`, `tests/js/`), `docs/handoff/`
 (packet as received), `./verify`.
 
-**Verify targets.** `fast` (~25 s warm): kit integrity, leak gate, structure,
-sha256 pins (26 oracle files), compare.js self-test (planted divergence must
-FAIL), C++ Release build, vectors and trig vs pinned, default-seed-1 vs
-golden, deep hidden state vs pinned for BOTH cores (default 1, chaos 7),
-properties (determinism, never-repeat). `full`: fast + the other three
-goldens, deep for both cores on all six runs, 440×280 bench < 4 ms on seeds
-1–3. CI runs `fast` on Linux/GCC against pins made with Apple clang, which
-makes it a cross-toolchain gate.
+**Verify targets.** `fast` (~60 s warm):
+- kit integrity, leak gate, structure;
+- sha256 pins over every oracle file (`golden/PINS.sha256`);
+- compare.js self-test (a planted divergence must FAIL);
+- C++ Release build; vectors and trig vs pinned;
+- default-seed-1 and the Spores input log (`cpp_inputs`) vs pinned;
+- deep hidden state vs pinned for BOTH cores (default 1, chaos 7, chaos-latency 7, default 7 + inputs);
+- properties: determinism, never-repeat, window wrap, latency L = 0 = instant, worker = synchronous, spores.
+
+`full` adds the other three goldens, deep for both cores on default 2–3, stress 4, chaos 11 and latency 1, and the 440×280 bench < 4 ms on seeds 1–3. CI runs `fast` on Linux/GCC against pins made with Apple clang, which makes it a cross-toolchain gate.
 Trig in the core is `core/src/fdlibm.hpp` (explicit-fma fdlibm, D-027) —
 never `std::cos`/`std::sin`.
 

@@ -150,6 +150,34 @@ bool latencyThreadedIsSynchronous() {
   return true;
 }
 
+// Spores (SPEC §10, D-037): emergeAt wraps onto the torus, refuses while a
+// search is pending or a retreat runs, and otherwise starts a search at the
+// chosen cell (the seed-7 input-log golden covers accepted spores; this
+// covers wrapping and both refusal paths, which that log never hits).
+bool sporesProperties() {
+  const Params p = defaultParams();
+  World w(220, 140, 3);
+  for (int g = 0; g < 50; g++) { w.step(p); w.work(p, World::kUnlimited); }
+  auto e = w.emergeAt(-1, 140 + 5, p);  // wraps to (219, 5)
+  if (!e || e->kind != Event::Searching || e->x != 219 || e->y != 5) { std::printf("spores: FAIL wrap\n"); return false; }
+  if (w.emergeAt(10, 10, p)) { std::printf("spores: FAIL accepted while a search is pending\n"); return false; }
+  if (w.forceEmerge(p)) { std::printf("spores: FAIL force accepted while a search is pending\n"); return false; }
+  // Drive a world into a retreat and check refusal there too.
+  Params q = stressParams(); q.extinction = 30;
+  World r(64, 48, 3);
+  bool sawRetreat = false;
+  for (int g = 0; g < 20000 && !sawRetreat; g++) {
+    r.step(q); r.work(q, World::kUnlimited);
+    if (r.retreat) {
+      sawRetreat = true;
+      if (r.emergeAt(5, 5, q)) { std::printf("spores: FAIL accepted during a retreat\n"); return false; }
+    }
+  }
+  if (!sawRetreat) { std::printf("spores: FAIL no retreat reached (test did not exercise refusal)\n"); return false; }
+  std::printf("spores: ok (wraps (-1, 145) to (219, 5); refused while searching and during a retreat)\n");
+  return true;
+}
+
 }  // namespace
 
 int main() {
@@ -158,5 +186,6 @@ int main() {
   ok = windowWraps() && ok;
   ok = latencyZeroIsInstant() && ok;
   ok = latencyThreadedIsSynchronous() && ok;
+  ok = sporesProperties() && ok;
   return ok ? 0 : 1;
 }

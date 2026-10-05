@@ -199,6 +199,13 @@ class World {
   // search starts), so an adapter can launch it early. Null when none.
   const SearchJob* latencyJob() const { return job_ ? &*job_ : nullptr; }
   std::optional<Event> forceEmerge(const Params& p);
+  // Spores (SPEC §10, D-037): a user-placed emergence. Wraps (x, y) onto the
+  // torus and, when no search is pending and no retreat is running, starts a
+  // search exactly as a natural birth would, hashed from the 7x7 around that
+  // cell (which need not belong to the frontier tier); otherwise refuses
+  // (nullopt). The spending budget, the on/off switch and the "made by the
+  // user" mark are shell state, not World state: the core never reads them.
+  std::optional<Event> emergeAt(int x, int y, const Params& p);
 
   int frontier() const { return int(tiers.size()) - 1; }
 

@@ -627,6 +627,13 @@ Event World::place(const Rule& rule, double speedFound) {
   return Event{Event::Birth, idx, s.cx, s.cy, gen, false};
 }
 
+std::optional<Event> World::emergeAt(int x, int y, const Params& p) {
+  if (retreat || search) return std::nullopt;
+  x = ((x % W) + W) % W;
+  y = ((y % H) + H) % H;
+  return emerge(y * W + x, lastMax, p, nullptr, -1);
+}
+
 std::optional<Event> World::forceEmerge(const Params& p) {
   if (retreat || search || lastArg < 0) return std::nullopt;
   return emerge(lastArg, lastMax, p, nullptr, -1);

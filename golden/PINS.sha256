@@ -1,6 +1,7 @@
 d00a9cf00a13ecebe7fad23bcd56a3a485a0c023dcafa89ff912ca9ee91547cd  golden/default-seed-1.jsonl
 1dbde04b0e59a920a2f5417b9940fa754d5ac89870248fe510f0340b0827464d  golden/default-seed-2.jsonl
 a8fafafd726f3b775b1c1f9109388af617a1cf42d620df228bbe699f21b9e45f  golden/default-seed-3.jsonl
+9c9f042ffe7dca99c5e4575d9a35cb25f97610b3759fb2a060859588332bb19a  golden/default-seed-7-inputs.jsonl
 e7b0d85f046c577f0c0960121988c2c6200ffb87701f9f29777fa7910ac4ae61  golden/stress-seed-4.jsonl
 1e843725c95f0127877d06b393f9273ed83ae2d92a85f1ef43c75524ce58dfb8  golden/deep/chaos-latency-seed-7.txt
 2abab45a15dd87a7daa2d1fef9eb82b8cb48d309bb013bfc35667e64b34f1b76  golden/deep/chaos-seed-11.txt
@@ -8,6 +9,7 @@ e7b0d85f046c577f0c0960121988c2c6200ffb87701f9f29777fa7910ac4ae61  golden/stress-
 25bd6bd2194820e0c4eb23c9db74542ca1a74a32f34c4ff9d20bbf96f653e85a  golden/deep/default-seed-1.txt
 e3db25e7b6e422c05598fd4a5b570ec9b86083a1e830ad8da9e8c006e0c4fa26  golden/deep/default-seed-2.txt
 6db25db69c9f600e273f8c0ef6b95364b62dfcd5b69f50986c1bf982c1cb2ca5  golden/deep/default-seed-3.txt
+5d77de1ff224c6eebea4912d46465bd2f3939b90438dc6d5075ead8309203b7c  golden/deep/default-seed-7-inputs.txt
 f6944e7bf8894b964d5adde59eea0945572c2ee1b5256c46ef6bac6fe232671e  golden/deep/latency-seed-1.txt
 600bc91d0e1a8c534353f6c4ac78e59c1f81648ff33be8a117231448ec5c30bf  golden/deep/stress-seed-4.txt
 fe40a8da5d8af79b4b2bcc82e8a36f74561898eb7b6225395cb3cbb9ea231c2a  golden/js-v1/default-seed-1.jsonl

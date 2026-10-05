@@ -31,6 +31,7 @@ class World {
   std::optional<Event> workLatency(const Params& p, int L, const Resolver& resolve);
   const SearchJob* latencyJob() const { return job_ ? &*job_ : nullptr; }
   std::optional<Event> forceEmerge(const Params& p);
+  std::optional<Event> emergeAt(int x, int y, const Params& p);
 
   int frontier() const { return int(tiers.size()) - 1; }
 

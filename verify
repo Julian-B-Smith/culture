@@ -47,7 +47,8 @@ structure_gate() {
   for f in CLAUDE.md README.md ROADMAP.md DECISIONS.md INDEX.md LIBRARY.md \
            project.manifest.json tools/compare.js golden/PINS.sha256 traces/README.md \
            CMakeLists.txt core/src/core.cpp core/src/fdlibm.hpp core/ref/core_ref.cpp \
-           tests/vectors.expected tests/trig.expected tests/properties.cpp; do
+           tests/vectors.expected tests/trig.expected tests/properties.cpp \
+           golden/default-seed-7-inputs.jsonl reference/v6/golden/run-seed-7.json; do
     [ -e "$f" ] || { echo "structure_gate: missing $f" >&2; ok=1; }
   done
   python3 -c 'import json,sys; m=json.load(open("project.manifest.json")); sys.exit(0 if m["survey"]["architecture_rung"]["choice"] in (1,2,3) else 1)' \
@@ -155,26 +156,45 @@ cpp_parity() {
   return $ok
 }
 
+# Spores input-log replay (SPEC §10, D-037): the pinned C++ trace of
+# reference/v6/golden/run-seed-7.json. (The JS replay in reference/v6/golden/
+# runs v0 semantics; at hand-over the C++ replay matched its world state for
+# all 3000 gens, and only the wrapped surprise fields of D-031 differed.)
+cpp_inputs() {
+  local tmp out
+  tmp="$(mktemp -d)"
+  "$PWD/build/culture_trace" --inputs reference/v6/golden/run-seed-7.json --out "$tmp" >/dev/null || { rm -rf "$tmp"; return 1; }
+  out="$(node tools/compare.js golden/default-seed-7-inputs.jsonl "$tmp/default-seed-7-inputs.jsonl" --float-rel 0)"
+  rm -rf "$tmp"
+  case "$out" in
+    PASS*) echo "cpp_inputs: default-seed-7-inputs $out" ;;
+    *)     echo "cpp_inputs: default-seed-7-inputs $out" >&2; return 1 ;;
+  esac
+}
+
 # Deep parity against the pinned deep goldens, for one core ("opt" = the
 # optimized culture::World, "ref" = the frozen naive core_ref). The goldens
 # hash only alive/tier; a planted `0.8f` in the pressure decay passed all of
 # them and this caught it at gen 866 (D-025). The output must have exactly
 # <gens> lines: an empty output would otherwise "match" nothing at all.
-# Args: core, then "<profile> <seed> <gens>" triples.
+# Args: core, then "<profile> <seed> <gens> [inputs.json]" entries; with an
+# input log the golden is golden/deep/<profile>-seed-<seed>-inputs.txt.
 deep_check() {
-  local core="$1" ok=0 t profile seed gens d out g
+  local core="$1" ok=0 t profile seed gens run d out g extra
   shift
   for t in "$@"; do
-    read -r profile seed gens <<<"$t"
-    g="golden/deep/$profile-seed-$seed.txt"
-    out="$("$PWD/build/culture_trace" --deep --core "$core" --profile "$profile" --gens "$gens" "$seed")"
+    read -r profile seed gens run <<<"$t"
+    g="golden/deep/$profile-seed-$seed.txt"; extra=()
+    local label="$profile-seed-$seed"
+    if [ -n "$run" ]; then g="golden/deep/$profile-seed-$seed-inputs.txt"; extra=(--inputs "$run"); label="$label-inputs"; fi
+    out="$("$PWD/build/culture_trace" --deep --core "$core" --profile "$profile" --gens "$gens" ${extra[@]+"${extra[@]}"} "$seed")"
     if [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" != "$gens" ]; then
-      echo "deep[$core]: FAIL $profile-seed-$seed — expected $gens lines" >&2; ok=1; continue
+      echo "deep[$core]: FAIL $label — expected $gens lines" >&2; ok=1; continue
     fi
     if d="$(diff "$g" <(printf '%s\n' "$out"))"; then
-      echo "deep[$core]: $profile-seed-$seed hidden state = pinned for $gens gens"
+      echo "deep[$core]: $label hidden state = pinned for $gens gens"
     else
-      echo "deep[$core]: FAIL $profile-seed-$seed — first divergence (columns: trace/main.cpp runDeep):" >&2
+      echo "deep[$core]: FAIL $label — first divergence (columns: trace/main.cpp runDeep):" >&2
       printf '%s\n' "$d" | head -4 >&2; ok=1
     fi
   done
@@ -221,8 +241,9 @@ fast() {
     cpp_vectors || ok=1
     cpp_trig || ok=1
     cpp_parity "default 1" || ok=1
-    deep_check opt "default 1 3000" "chaos 7 4000" "chaos-latency 7 4000" || ok=1
-    deep_check ref "default 1 3000" "chaos 7 4000" "chaos-latency 7 4000" || ok=1
+    cpp_inputs || ok=1
+    deep_check opt "default 1 3000" "chaos 7 4000" "chaos-latency 7 4000" "default 7 3000 reference/v6/golden/run-seed-7.json" || ok=1
+    deep_check ref "default 1 3000" "chaos 7 4000" "chaos-latency 7 4000" "default 7 3000 reference/v6/golden/run-seed-7.json" || ok=1
     cpp_props || ok=1
   else
     ok=1

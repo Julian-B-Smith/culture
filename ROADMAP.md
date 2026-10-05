@@ -104,7 +104,7 @@ hold **and** a `traces/` entry is written.
   off by ear** on register spread and riser level.
 
 ### P1b — Spores in the C++ core (D-037)
-- **Status:** open (ready; next)
+- **Status:** done 2026-10-05 (D-038; trace: traces/2026-10-05-spores.md)
 - **Acceptance:**
   1. `World::emergeAt(x, y, p)` per SPEC §10 in `core/` and `core/ref/` in
      one commit; existing goldens and deep goldens unchanged.
