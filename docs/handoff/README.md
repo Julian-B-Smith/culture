@@ -4,6 +4,8 @@ This packet hands the Culture prototype to Claude Code for a C++ port and onward
 
 ## Start here
 
+**Already ported? (Julian-B-Smith/culture, last import v3):** read **PORT-NOTES-v6.md** first. It says what changed since v3 and how to import it.
+
 1. Read **BRIEF.md**: what the project is, where it stands, and the open questions for spin-up.
 2. Read **SPEC.md**: the simulation, step by step. `reference/core.js` is normative.
 3. Read **DECISIONS.md**: the design history, including what was tried and rejected.
@@ -17,8 +19,10 @@ README.md          this file, including the kickoff prompt
 BRIEF.md           vision, current state, spin-up questions, ground rules
 SPEC.md            exact simulation spec, parameters, RNG order, known quirks
 SOUND.md           sonification spec and port notes
-DECISIONS.md       seed decision log D-001 … D-019; prototype decisions P-020 … P-035 (renumbered on import, D-036)
+DECISIONS.md       seed decision log D-001 … D-019; prototype decisions P-020 … P-053 (renumbered on import, D-036/D-037)
 PORT_PLAN.md       phases 0–5 with acceptance criteria
+PORT-NOTES-v6.md   for the existing C++ port: what v4–v6 change and how to import them
+SITE-NOTES-v6.md   for the website (mind-lathe) agent only
 reference/
   culture.html     the full browser prototype, one self-contained file; open it in a browser
   core.js          deterministic simulation core (Node-loadable: require('./core.js'))
@@ -26,12 +30,20 @@ reference/
   recorder.js      replay recorder: rolling encoders so Record can start 15–20 s in the past
   crt.js           optional CRT look: two-pass WebGL filter (phosphor persistence; then beam, phosphor mask, glow, curvature)
   osd.js           on-screen television menu, drawn into the CRT picture in full screen
+  logo.js          the mindlathe logo (embedded image) for the opening title
+  texture.js       rule fingerprints and live texture descriptors (timbres)
+  timbre.js        sound classes, the shared pulse, chords and the consonance check
+  engines.js       the breath, rumble, arpeggio and crystal engines
+  drums.js         synthesized drum kit (plus unused "space" percussion)
+  rhythm.js        drum parts, breakbeat gravity, slicing and the scheduler
   ui.js            browser shell
 tools/
-  golden.js        regenerate golden traces:  node tools/golden.js [--profile default|stress] [--out dir] [seed…]
+  golden.js        regenerate golden traces:  node tools/golden.js [--profile default|stress] [--out dir] [--inputs run.json] [seed…]
   compare.js       check a port trace:         node tools/compare.js golden/<file>.jsonl <port>.jsonl
 golden/
   default-seed-{1,2,3}.jsonl   3,000 gens each, prototype defaults, instant search
+  default-seed-7-inputs.jsonl  3,000 gens replaying run-seed-7.json: two spores and a forced emergence (SPEC §10)
+  run-seed-7.json              the input log for it, in the page's window.cultureRun() format
   stress-seed-4.jsonl          5,000 gens; sparks and mutation up, no crowding brake.
                                Covers surprise, spark and mutation births, extinction and retreat
 ```

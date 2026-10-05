@@ -48,7 +48,9 @@ const Recorder = (() => {
     }
     startSeg(audio) {
       const chunks = [];
-      const rec = new MediaRecorder(this.stream(audio), { mimeType: this.mime, videoBitsPerSecond: this.touch ? 5e6 : 10e6 });
+      // A busy cellular world is close to worst-case footage for a video encoder (fine detail
+      // everywhere, all of it moving), so the bitrate is set high.
+      const rec = new MediaRecorder(this.stream(audio), { mimeType: this.mime, videoBitsPerSecond: this.touch ? 12e6 : 24e6 });
       rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
       rec.start(1000);
       const seg = { rec, chunks, t0: performance.now() };

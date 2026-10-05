@@ -53,13 +53,16 @@ Add unit tests per component. Both screening functions are pure given an RNG sta
 
 ## Phase 2: Viewer
 
+- Spores (SPEC §10): pointer to cell through rotation and the CRT curvature, the shared budget, the readout, the Spores switch and the input log.
+- The television menu as the one control surface in full screen, CRT or flat, with its sub-menus and SCOPES pages (P-049, P-051, P-052), and a speed limit measured on the device (P-053).
+
 - A window rendering Life and Memory views; birth rings, the search ring, and the markers toggle; the lineage panel; the surprise / quiet / reign meters; every control from the prototype (sizes, speeds ¼×–12×, crowding, mutation, spark, borders and memory, reactions); full screen with an auto-hiding HUD.
 - Search-timing mode is selectable: instant, deterministic latency (default L ≈ 30 generations), or sliced (prototype feel).
 - **Accept when:** side by side with `reference/culture.html` at the same seed and instant mode, the viewer shows the same world; a 550×350 world runs at 60 fps at 1×.
 
 ## Phase 3: Sound
 
-- Port SOUND.md. Same mappings and gestures; seeded reverb impulse and noise.
+- Port SOUND.md, including timbres and rhythm. Same mappings and gestures; seeded reverb impulse and noise, and a seeded generator for the sound layer's randomness (flicker, jitter, slicing, the conductor).
 - **Accept when:** a 10-minute run has no clicks or dropouts at 10 voices; an offline render of a fixed seed is bit-reproducible; and the user signs off by ear on register spread and riser level (both untuned in the prototype).
 
 ## Phase 4: Decide the quirks
