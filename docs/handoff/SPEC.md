@@ -225,3 +225,23 @@ The reference supports two call patterns, and the port should support both:
 - **Sliced** (browser): call `work(p, k)` once per animation frame, with k = 3. A birth lands some frames later, so the trace depends on the frame and speed schedule and is not reproducible across machines.
 
 For the port, a third mode is recommended: **deterministic latency**. Run the search on a worker thread, but apply its result at exactly `trigger gen + L` generations, blocking if it isn't ready. This gives fluid real-time playback and reproducible worlds at the same time. See PORT_PLAN.md.
+
+## 10. Spores (user-placed emergence)
+
+**`emergeAt(x, y, p)`** wraps `x` and `y` onto the torus and, when no search is pending and no retreat is running, calls `emerge(y·W + x, lastMax, p)`. It returns the search event, or null when refused. Everything downstream (hashing, search, screening, placement) is §5 unchanged. Note that the hash's 7×7 window is centred on the chosen cell, which need not belong to the frontier tier.
+
+**Budget (shell, not core).** The budget lives in the UI layer, not in `World`:
+- `ready` when no spent emergence is pending, `gen ≥ readyGen`, and the world has no search or retreat.
+- Spending (a spore or `forceEmerge`) when not ready is refused. When ready, the call is made; if it returns an event, the shell records the tier count and marks the emergence pending.
+- Each frame, once the world's search has ended: if the tier count grew, `readyGen = gen + 900`; either way the pending mark clears. So a search that finds no rule costs nothing.
+- A new world resets the budget.
+
+**Switch.** A Spores switch (page button, CRT menu item "SPORES"), on by default. Off, clicks do nothing and forced emergence bypasses the budget, as before spores existed.
+
+**User-made tiers.** When a spent emergence is born, the shell marks the new tier `byUser` (it is always the last tier, since searches never overlap). The core never reads this mark. The drum conductor (SOUND.md, Rhythm) counts only tiers without it, so spores and forced births don't rush the drums' build-up.
+
+**One-time hint.** The first time a browser shows full screen with spores on, the corner reads CLICK (or TAP) THE WORLD TO RELEASE A SPORE for 7 seconds. Whether it has been shown is remembered in localStorage when available.
+
+**Input log and replay.** Every successful spend, budgeted or not, is logged as `{ gen, kind: "spore" | "force", x, y }`, where gen, x and y are those of the search event. The page exposes `window.cultureRun()` → `{ seed, size: [W, H], inputs }`. `tools/golden.js --inputs run.json` replays a log: each input is applied when the world reaches its generation, before the next `step()`, and in instant-search mode its search runs to completion at once. A refused input is recorded as `{ input, refused: true }`. `golden/default-seed-7-inputs.jsonl` is the oracle for this path; the other traces use no input and are unchanged.
+
+A log taken from the browser describes a scenario rather than an exact replay, because the browser's sliced search depends on frame timing (§9). For exact replays, the port records and replays in one of its deterministic search modes.

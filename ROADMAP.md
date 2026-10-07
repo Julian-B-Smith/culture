@@ -88,15 +88,31 @@ hold **and** a `traces/` entry is written.
   world; 550×350 at 60 fps at 1×.
 
 ### P3 — Sound ← current
-- **Status:** next (chosen 2026-10-03, D-033); first step is listening. The
-  dev viewer plays the frozen v0 engine fed by the C++ core, and the human
-  picks the stack by ear. No longer blocked on P2: the engine only reads
-  snapshots, so it can be built and offline-rendered before any viewer.
+- **Status:** next (chosen 2026-10-03, D-033). **Reference: the v6 sound
+  layer** (D-037; `reference/v6/`, `docs/handoff/SOUND.md`): timbre classes,
+  a shared tempo field, the rhythm layer and conductor, drums on a ducked
+  sub bus, ear-model stereo, a VHS switch. The human picks the stack by ear
+  against v6. Not blocked on P2: the engine only reads snapshots.
+- **Determinism requirement (D-037):** v6's sound uses unseeded
+  `Math.random` in 39 places. The port needs its own seeded RNG for the
+  sound layer, separate from the core's mulberry32, so sound never consumes
+  core randomness and offline renders are bit-reproducible.
 - **Blocking open questions:** audio stack; whether Reverb Station's FDN
   replaces the convolution reverb (that would mean an intake brief).
 - **Acceptance:** PORT_PLAN P3 — 10-minute run at 10 voices with no clicks or
   dropouts; offline render of a fixed seed is bit-reproducible; **human signs
   off by ear** on register spread and riser level.
+
+### P1b — Spores in the C++ core (D-037)
+- **Status:** open (ready; next)
+- **Acceptance:**
+  1. `World::emergeAt(x, y, p)` per SPEC §10 in `core/` and `core/ref/` in
+     one commit; existing goldens and deep goldens unchanged.
+  2. `culture_trace --inputs run.json` replays an input log as SPEC §10
+     specifies (applied before the next step; refused inputs recorded).
+  3. A C++ input-log golden and deep golden pinned and checked for both
+     cores. `reference/v6/golden/` is the format spec, not the oracle: it
+     runs v0 semantics.
 
 ### P4 — Decide the quirks
 - **Status:** done 2026-10-02 (D-030 C++ canonical; D-031 decisions; trace: traces/2026-10-02-p4-decisions.md)

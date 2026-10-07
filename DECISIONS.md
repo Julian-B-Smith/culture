@@ -262,3 +262,118 @@ Decided:
 - The packet's decisions are imported as P-020…P-035.
 - The superseded local files are deleted after byte-identity checks: `culture_v2.html` (superseded by v3), `culture_v3.html` (= `reference/v3/culture.html`), `culture-handoff_v3.zip` (contents imported or identical), and the original `culture-handoff/` and `Culture.html` (v1, in git and tag `v0-js-parity`). Their `.gitignore` lines go too.
 Next, by the same poll: bring v3's presentation to the dev viewer, over the canonical core.
+
+---
+
+## Prototype decisions v4–v6 (handoff v6 packet, 2026-10-05)
+
+The packet's D-036…D-053, imported verbatim as **P-036…P-053** (P-0nn is the
+packet's D-0nn; citations between packet decisions converted the same way).
+Only P-042/P-047 (Spores) touch the simulation; see D-037. The rest is
+presentation (P2) or the sound layer (P3).
+
+**P-036: Opening title.**
+The user's mindlathe logo shows centred over the picture when the page opens, with a blinking green PRESS ENTER (TAP TO START on touch screens), and stays until Enter or a click or tap on the picture itself, then fades over 1 s. Buttons such as Full screen leave it in place, so it can be seen full screen; the dismissing click does nothing else. With CRT on it is drawn into the tube through the menu layer, so it gets the curvature, scanlines and phosphors; with CRT off it lies flat over the picture. Switching CRT on brings it back until the next interaction, like a television's power-on splash. (Considered and declined: seeding the first world with VCR-style static, or a static "tune-in" prelude.)
+
+**P-037: CRT on by default.**
+Pages open with the CRT view (and its tape sound when sound is on), so the opening logo arrives through the tube. Browsers without WebGL fall back to the flat view with the CRT button disabled.
+
+**P-038: Sound starts with the first Enter.**
+Dismissing the opening title for the first time (Enter, or a click or tap on the picture) also switches sound on, since that is the deliberate gesture browsers require before audio may play. Later dismissals, after switching CRT back on, leave sound as it is.
+
+**P-039: Recordings render their own full-resolution tube.**
+With CRT on, the recorder no longer stretches the on-screen WebGL canvas (often ~900 px wide) up to the clip size. A second CRT instance draws on an offscreen canvas at the recording's exact size (1920 wide or 1080² on desktop, 1280 or 720² on touch), sharing the mask type, OSD and glitch settings, so phosphor and scanline detail is native in the file. Bitrate raised from 10 to 24 Mbps (12 on touch): a busy cellular world is near worst-case content for an encoder. Cost: the CRT renders twice while recording is armed.
+
+**P-040: The opening logo is pixelated to the world's cell grid.**
+Before it reaches the CRT, the logo is reduced to one pixel per world cell (area-averaged in halving steps so thin strokes survive as soft pixels) and drawn back as hard blocks snapped to the cell grid. It then reads as an image made of the same picture elements as the world, and its pixels line up with the cell-space phosphor mask instead of floating on the glass as a sharp graphic. The flat (non-CRT) view does the same. Larger worlds give a finer logo.
+
+**P-041: The logo is opaque; on-screen graphics fully cover the picture.**
+After pixelation, each logo pixel is made either fully opaque or empty (alpha threshold 90/255), so the world no longer shows through its strokes. The CRT shader now lets an opaque OSD pixel replace the picture completely (it used to leave 20% showing). The menu box's fill alpha drops from 0.8 to 0.65, so it looks as see-through as before.
+
+**P-042: Spores: emergence released by a click, on a shared budget.**
+A click or tap on the world releases a spore: a new nature is born at that cell through `emergeAt(x, y, p)`, which starts the same search as a natural surprise birth (`emerge(site, lastMax, p)`), so the rule is derived from the 7×7 configuration under the click and no rule repeats. Spores and forced emergence (E, the Emerge buttons, the menu item) spend one budget. It is refused while any rule search or retreat runs, and it recharges over 900 generations after the spent emergence is actually born; a search that finds nothing viable costs nothing. Measuring in generations ties the wait to the world, so pausing or slowing stretches it. The budget is shown top left in full screen while the controls are showing (drawn into the CRT picture, or a small badge without CRT), and as a line under the world on the page: SPORE READY; SPORE with eight blocks filling from hollow to solid; GERMINATING… while a spent emergence searches; SPORE WAIT while the world's own search or a retreat runs; NOT READY flashing after a refused attempt. The pointer is mapped back through the portrait rotation and the CRT curvature, so the spore lands where the click was. Name chosen by the user over "plant".
+
+**P-043: Timbres: a sound class per ruleset, from how it looks.**
+Each tier gets one of five classes (drone, breath, rumble, arpeggio, crystal), chosen once at birth from a fingerprint of how its rule behaves on a seeded test patch, and from its colour. Tier 0 is always a drone. Colour temperature shapes every class: warm is rounder and darker, cold is glassier and purer, moss is organic, ash is dusty. Arpeggios and bells share one pulse and keep consonant with what is already sounding (SOUND.md, Timbres). The user first heard every class layered over its drone, found that too much, and chose to make the drone one class among five with a fair share.
+
+**P-044: Every birth is heard; fullness sets level and space.**
+A newborn is always voiced for its first 12 seconds, and a tier keeps its voice down to 60 cells; at 0.2% of the world, most newborn discs were silenced within 1.5 s. Small territories are relatively louder (cover^0.35). Rumble gained upper harmonics and a low-mid growl so it carries on laptop speakers. Overall level follows how much of the world is alive, and a second, longer and darker room opens as the world empties.
+
+**P-045: Stereo by ear, not by pan pot; softer bells.**
+Placement uses timing (up to 0.66 ms), level (up to about −5 dB) and head-shadow filtering between the ears, plus a small fixed per-voice offset, instead of a pan control, which the user found jarring. Phones keep the plain panner for CPU. Bells come in lower, through a high shelf.
+
+**P-046: Rhythm layer.**
+The largest tiers play drum parts on the shared pulse. Class picks the instruments, disorder picks the syncopation, and colour picks the feel. Breakbeat gravity pulls kicks to 1 and snares to 2 and 4, against a chaotic pull away. Every rule is set in SOUND.md, Rhythm; this entry records what the user chose:
+- **One kick leads.** Other kicks, toms and the rest duck under it; snares, claps and hats don't. Kicks sit dead centre, and each tier's kick has its own punch.
+- **Sidechain.** The ambient lows duck under the lead kick.
+- **Arpeggio tiers rarely add drums**, since they read as stray noise.
+- **An empty map plays sparse.**
+- **The conductor builds suspense.** Silence until a few emergences, then sections that add textures, snares and kicks in turn, with full rests between.
+- **Slicing.** Drill'n'bass bursts and rolls, which the user liked.
+- **Traditional kit.** A synthesized "space" percussion set was tried and set aside, kept in the code unused, until the user builds his own.
+- **Switch.** Drums can be toggled from the page, the CRT menu, full screen and the D key.
+
+**P-047: Spores are standard.**
+The two packets merge back into one, with spores included.
+- **Switch.** Spores have a switch, on by default. Off, clicks do nothing and E is unlimited again.
+- **Hint.** A one-time hint in full screen tells a first-time visitor that clicking the world releases a spore.
+- **Input log.** Every spore and forced emergence is logged as an input event, readable with `window.cultureRun()`, and the trace tool can replay a log. A replay trace is now part of the oracle.
+- **Drum build-up.** Tiers made by spores or by E are marked, and the drum conductor counts only the world's own emergences, so spores add life without skipping the suspense.
+- **Where the budget lives.** It stays in the shell rather than the core; only spends that happened are logged (SPEC §10).
+
+**P-048: The menu fits on short screens.**
+Spores, Timbres and Drums took the menu to 15 rows, which ran off the bottom on landscape phones and short windows. The lettering now shrinks just enough for the whole box, hint line included, to fit with a margin above the curved edge. Tall screens are unchanged.
+
+**P-049: Fixes merged from the website (mind-lathe D36 to D39).**
+The website had patched four things that belong to Culture itself; they now live here.
+- **One control surface** (site D37). In full screen, the television menu and hint strip are the controls whether the CRT is on or off. Without the CRT they are drawn flat over the picture. The menu's CRT row reads ON or OFF and switches both ways. This also fixes the site's D36 bug, where switching the CRT off from the menu left the controls hidden.
+- **Pausing halts the sound** (site D38). Pause fades the master over about 0.1 s, then suspends the audio clock; play resumes it and fades back. Every scheduled part freezes with the clock, so nothing bursts out on resume. Sound switched on while paused stays silent until play.
+- **Sound on touch browsers** (site D39). A touch `pointerdown` is not a user gesture to iOS Safari or to Chrome on touch screens, so the context could start locked while SOUND read ON. Every tap, click or key now resumes a context that is not running, if sound is on and the world is playing. This also recovers from iOS interruptions (calls, app switches). A context paused on purpose is left alone.
+- **CRT off by default on touch devices** (site D36). The tube aliases on small screens and is heavy for a phone's GPU. Computers still open with it on.
+
+**P-050: VHS audio has its own switch.**
+The tape chain on the mix (wow and flutter, band limits, saturation, hiss, hum) used to follow the CRT picture. It is now independent and on by default: page button, the menu (Audio ▸ VHS Audio) and the V key.
+
+**P-051: The menu has sub-menus.**
+- **Top level:** Picture, Speed, Emerge, New World, Spores, Record, Sound, Volume, then Audio ▸, Screen ▸, World ▸, Borders ▸, Scopes ▸ and Exit.
+- **Audio ▸** Timbres, Drums, VHS Audio.
+- **Screen ▸** CRT, Mask, Fit/Fill.
+- **World ▸** Size, Crowding, Rarity, Record life, Invasion, Mutation, Sparks, Reactions.
+- **Borders ▸** Contact, Hardening, Resistance, Harm memory, Noise, Stats memory.
+
+Sub-menu rows drive the page's own sliders, so the two always agree. Every sub-menu ends in BACK. Esc, Backspace, or Left on a row with no setting go back one level, and the menu reopens at the top. Spores stayed at the top level, since it is interaction rather than audio. Size moved into World at the user's request.
+
+**P-052: SCOPES.**
+Four full-box chart pages in the menu's style:
+- **LINEAGE:** tiers with swatch, rule, territory bar, sound type and state.
+- **TERRITORY:** a stacked chart of who holds the world over the last minute, with births marked.
+- **SURPRISE:** a segmented meter against the threshold, its one-minute trace, and quiet and reign meters.
+- **SIGNAL:** a triggered oscilloscope and a 24-band segmented spectrum of the final mix (an AnalyserNode after the tape chain), plus tempo, drum section, voices and VHS.
+
+Left/Right or taps on the box's left and right thirds turn pages; Esc, or a tap on the title, goes back. A scope page does not auto-close. Charts sample four times a second and freeze while paused.
+
+Look, at the user's direction:
+- **Pixelation:** chart shapes are drawn at one pixel per world cell and scaled up with hard edges, like the logo; the lettering stays crisp.
+- **Translucency:** the box has the menu's translucency, with darker plates under the charts.
+- **Dimming:** an open menu or scope dims the whole picture (60% black), in the tube and flat alike.
+- **Glow:** the tube's glow no longer bleeds through on-screen graphics.
+
+**P-053: Speed is limited to what the device sustains; the core is faster.**
+A generation costs about 2 ms at 165×105, 6–10 ms at 330×210 and about 22 ms at 550×350 on a laptop, so speeds above a few × were never reachable on larger worlds, and 550×350 runs below real time at 60 fps.
+- **The limit:** the page times its own generations and offers only speeds it can sustain with about 14 ms of simulation per frame. 1× always stays available. Hovering the slider says what the limit is.
+- **Remembered speed:** the requested speed is kept separately, so a limit lifted later (a smaller world) brings it back.
+- **Faster core:** the core's cell loops were tightened by hoisting per-tier rules and parameters into typed arrays and locals, wrapping without modulo, using a typed array for pattern codes, and computing one logarithm per pattern instead of one per cell. Results are bit-identical, and all five golden traces pass. The gain is about 20% at the largest size.
+
+**D-037: Handoff v6 imported; Spores to be ported; P3 and the viewer retarget to v6 (2026-10-05, human decisions by poll).**
+v6 is cumulative (the prototype's v4, v5 and v6). Each claim in its PORT-NOTES was checked rather than trusted:
+- **Byte-identical:** the four JS goldens (= `golden/js-v1/`) and `compare.js`.
+- **Optimized JS core:** it regenerates all four goldens byte-identically, so the optimization changes nothing on the golden paths. It is irrelevant to the canonical C++.
+- **The one semantic addition** is `emergeAt(x, y, p)` (SPEC §10, P-042/P-047). It wraps onto the torus and, when no search or retreat is running, calls the existing `emerge` at that cell. The budget, switch and `byUser` mark are shell state.
+- **`golden.js --inputs` and `default-seed-7-inputs.jsonl`:** produced by the v6 JS core (v0 semantics), so they are the replay-format specification, not a C++ oracle.
+- **Unseeded randomness:** the sound modules call `Math.random` in 39 places; the core calls it in none.
+- **`logo.js`:** an embedded WebP with no EXIF/XMP/ICC metadata.
+Decided:
+(1) v6's `reference/` is frozen and pinned in `reference/v6/` **including its `core.js`**, which now differs from `reference/core.js`. The packet's `golden.js` and input-log golden go to `reference/v6/tools/` and `reference/v6/golden/` as the replay spec. `reference/v3/` is retired (v6 supersedes it; git keeps it). `docs/handoff/` is at v6, with packet citations as P-numbers; `PORT-NOTES-v6.md` is kept as provenance. `SITE-NOTES-v6.md` belongs to the website session and is not imported. Packet decisions are imported as P-036…P-053.
+(2) **Port Spores now:** `emergeAt` in `core/` and `core/ref/` in one commit, `culture_trace --inputs`, and a C++ input-log golden and deep golden pinned for both cores. The existing goldens must not move. User-made tiers are marked by birth serial (D-031 #8).
+(3) **P3's reference is the v6 sound layer:** timbres, rhythm and conductor, drums on a ducked bus, ear-model stereo, a VHS switch (SOUND.md, P-043…P-046, P-050). The port adds a seeded RNG for the sound layer, separate from the core's, so offline renders are bit-reproducible. This supersedes D-033's v0 reference for the sign-off.
+(4) **The dev-viewer plan** (run the prototype's own UI on the C++ core) **retargets from v3 to v6.** It comes after the Spores port, which v6's UI needs.

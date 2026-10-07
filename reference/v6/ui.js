@@ -6,6 +6,22 @@
   };
   let shape = 'wide';
   const sizes = () => SHAPES[shape];
+  // Spores: a click on the world releases a new nature there. Spores and forced emergence (E, the
+  // Emerge buttons) draw on one budget that recharges in generations, so pausing or slowing the
+  // world also stretches the wait (900 gen is about 15 s at 1×). The wait starts when the new law
+  // is actually born; a search that finds nothing viable costs nothing.
+  const SPORE_COOL = 900;
+  let sporeReadyGen = 0, sporePending = null, sporeDenied = -1;
+  // The Spores switch. Off: clicks do nothing and E emerges freely, as before spores existed.
+  let sporesOn = true, pendingBudgeted = false;
+  // Every spore and forced emergence is logged as an input event, so a run can be replayed from
+  // its seed: { gen, kind: 'spore' | 'force', x, y }. Read it with window.cultureRun().
+  let runLog = [];
+  window.cultureRun = () => ({ seed: world.seed, size: [W, H], inputs: runLog.map(e => ({ ...e })) });
+  // One-time hint: the first time this browser sees full screen with spores on, the corner says
+  // what a click does for a few seconds.
+  let hintUntil = 0, hintShown = false;
+  try { hintShown = localStorage.getItem('culture.sporeHint') === '1'; } catch (e) {}
   let W = 220, H = 140;
   const $ = id => document.getElementById(id);
   const cv = $('world'), ctx = cv.getContext('2d');
@@ -18,39 +34,172 @@
   try { touch = matchMedia('(pointer: coarse)').matches; } catch (e) {}
   const replay = new Recorder.Replay({ touch });
   // CRT filter: created on first use; unavailable where WebGL is.
-  let crtOn = false, crt = null;
+  let crtOn = false, crt = null, recCrt = null, recCrtCanvas = null;
   // With CRT on in full screen, the controls become the television's own on-screen menu.
   const osd = new OSD.Menu();
-  let osdDrawn = 0, wokeFromIdle = false;
-  const osdActive = () => crtOn && !!crt && isFull();
+  let osdDrawn = 0, wokeFromIdle = false, flatOsdAmt = 0;
+  // The television menu and hint strip are the controls whenever the world fills the window,
+  // CRT or not (from the site, mind-lathe D37). Without the CRT they are drawn flat over the
+  // picture (see the frame loop).
+  const osdActive = () => isFull();
+  // The television menu: a short top level, and sub-menus (marked >) for audio, screen and the
+  // automaton's controls. Every sub-menu ends in BACK; Esc, Backspace or Left on a plain row also
+  // goes back one level. Sub-menu rows for the world's settings drive the page's own sliders, so
+  // the two always agree.
+  function slider(id, label) {
+    const el = $(id), step = +el.step || 1;
+    const nudge = d => { el.value = Math.max(+el.min, Math.min(+el.max, +el.value + d * step)); el.dispatchEvent(new Event('input')); };
+    return { label, value: () => $(id + 'o').textContent.replace(' per 10k contacts', '/10K').replace(/×/g, 'X').toUpperCase(),
+      dec: () => nudge(-1), inc: () => nudge(1) };
+  }
+  const BACK = { label: 'BACK', back: true, value: () => '<' };
+  const sub = (label, items) => ({ label, value: () => '>', sub: () => [...items(), BACK] });
   const osdItems = () => [
     { label: 'PICTURE', value: () => (running ? 'PLAY' : 'PAUSE'), act: () => setRunning(!running) },
     { label: 'SPEED', value: () => $('speedo').textContent.replace('×', 'X'), dec: () => nudgeSpeed(-1), inc: () => nudgeSpeed(1) },
-    { label: 'SIZE', value: () => $('hsizeo').textContent.replace('×', 'X'), dec: () => stepSize(-1), inc: () => stepSize(1) },
-    { label: 'EMERGE', act: () => handle(world.forceEmerge(params)) },
+    { label: 'EMERGE', act: () => forceEmerge() },
     { label: 'NEW WORLD', act: () => { newWorld(); layout(); } },
+    { label: 'SPORES', value: () => (sporesOn ? 'ON' : 'OFF'), act: () => setSpores(!sporesOn) },
     { label: 'RECORD', disabled: !replay.supported, act: () => toggleRecord(),
       value: () => replay.keeper ? `REC ${Math.floor(replay.elapsed() / 60)}:${String(Math.floor(replay.elapsed()) % 60).padStart(2, '0')}` : replay.armed ? 'BUFFERING' : 'READY' },
     { label: 'SOUND', value: () => (soundOn ? 'ON' : 'OFF'), act: () => toggleSound() },
     { label: 'VOLUME', bar: () => $('volume').value / 100, dec: () => nudgeVolume(-10), inc: () => nudgeVolume(10) },
-    { label: 'MASK', value: () => MASKS[crt ? crt.maskType : 1].toUpperCase(), act: () => cycleMask(1), dec: () => cycleMask(-1), inc: () => cycleMask(1) },
-    { label: 'SCREEN', value: () => (fillMode ? 'FILL' : 'FIT'), act: () => $('hfill').click() },
-    { label: 'CRT', value: () => 'ON', act: () => setCrt(false) },
+    sub('AUDIO', () => [
+      { label: 'TIMBRES', value: () => (sonic.timbres ? 'ON' : 'OFF'), act: () => setTimbres(!sonic.timbres) },
+      { label: 'DRUMS', value: () => (sonic.rhythm !== false ? 'ON' : 'OFF'), act: () => setRhythm(sonic.rhythm === false) },
+      { label: 'VHS AUDIO', value: () => (vhsOn ? 'ON' : 'OFF'), act: () => setVhs(!vhsOn) },
+    ]),
+    sub('SCREEN', () => [
+      { label: 'CRT', value: () => (crtOn ? 'ON' : 'OFF'), act: () => setCrt(!crtOn) },
+      { label: 'MASK', value: () => MASKS[crt ? crt.maskType : 1].toUpperCase(), act: () => cycleMask(1), dec: () => cycleMask(-1), inc: () => cycleMask(1) },
+      { label: 'FIT', value: () => (fillMode ? 'FILL' : 'FIT'), act: () => $('hfill').click() },
+    ]),
+    sub('WORLD', () => [
+      { label: 'SIZE', value: () => $('hsizeo').textContent.replace('×', 'X'), dec: () => stepSize(-1), inc: () => stepSize(1) },
+      slider('crowding', 'CROWDING'), slider('margin', 'RARITY'), slider('patience', 'RECORD LIFE'),
+      slider('maxSpeed', 'INVASION'), slider('mutation', 'MUTATION'), slider('spark', 'SPARKS'),
+      { label: 'REACTIONS', value: () => (params.reactions ? 'ON' : 'OFF'), act: () => $('reactions').click() },
+    ]),
+    sub('BORDERS', () => [
+      slider('hold', 'CONTACT'), slider('hardness', 'HARDENING'), slider('gain', 'RESISTANCE'),
+      slider('forget', 'HARM MEMORY'), slider('noise', 'NOISE'), slider('memory', 'STATS MEMORY'),
+    ]),
+    { label: 'SCOPES', value: () => '>', act: () => { scopeOn = true; scopePage = 0; openMenu(true); } },
     { label: 'EXIT', act: () => exitFull() },
   ];
+  // ── Scopes ──
+  // Full-box pages in the menu, drawn like a television's own charts: the lineage, who holds the
+  // world over the last minute, surprise against its threshold, and the live audio signal.
+  const SCOPE_PAGES = ['LINEAGE', 'TERRITORY', 'SURPRISE', 'SIGNAL'];
+  let scopeOn = false, scopePage = 0, hist = [], histAt = 0, histGen = 0;
+  // Four samples a second while the world runs (a paused world leaves the charts still): each
+  // tier's share of the world, frontier surprise as a share of its threshold, and whether a birth
+  // landed since the last sample. One minute is kept.
+  function sampleScopes() {
+    const t = performance.now();
+    if (!running || t - histAt < 250) return;
+    histAt = t;
+    const n = W * H, thr = world.record * (1 + params.margin);
+    hist.push({
+      covers: world.tiers.filter(T => T.cells > 0).map(T => [colorOf(T).css, T.cells / n]),
+      ratio: thr > 0 && world.frontierAge > world.warm ? world.lastMax / thr : 0,
+      birth: world.lastBirth > histGen,
+    });
+    histGen = world.gen;
+    if (hist.length > 240) hist.shift();
+  }
+  function scopeData() {
+    const n = W * H, page = SCOPE_PAGES[scopePage], d = { page, pages: SCOPE_PAGES, index: scopePage };
+    if (page === 'LINEAGE') {
+      const live = world.tiers.slice().reverse(), gone = world.extinct.slice(-3).reverse();
+      d.rows = [...live.map(T => [T, false]), ...gone.map(T => [T, true])].map(([T, dead]) => ({
+        name: 'T' + T.idx, rule: Core.ruleStr(T.rule), css: colorOf(T).css, cover: dead ? 0 : T.cells / n, dead,
+        state: dead ? 'GONE' : T.dying ? 'RETREAT' : T.idx === world.frontier ? 'FRONTIER' : T.byUser ? 'SPORE' : '',
+        cls: (sonic.timbres ? sonic.classOf(T) : 'drone').toUpperCase(),
+      }));
+    } else if (page === 'TERRITORY' || page === 'SURPRISE') {
+      d.hist = hist;
+      const thr = world.record * (1 + params.margin);
+      d.ratio = thr > 0 && world.frontierAge > world.warm ? world.lastMax / thr : 0;
+      d.warm = world.frontierAge <= world.warm;
+      d.quiet = (world.gen - world.lastBirth) / world.meanEpoch;
+      const R = world.reignTier;
+      d.reign = R ? { name: 'T' + R.idx, css: colorOf(R).css, frac: (world.gen - world.reignStart) / world.meanEpoch } : null;
+      d.searching = !!world.search;
+    } else if (page === 'SIGNAL') {
+      const A = sonic.analyser, live = soundOn && running && A && sonic.ctx && sonic.ctx.state === 'running';
+      if (live) {
+        d.wave = new Float32Array(1024); A.getFloatTimeDomainData(d.wave);
+        d.spec = new Uint8Array(A.frequencyBinCount); A.getByteFrequencyData(d.spec);
+      }
+      d.live = !!live;
+      d.bpm = sonic.field ? Math.round(sonic.field.bpm) : null;
+      d.voices = sonic.voices ? sonic.voices.size : 0;
+      const C = sonic.cond, a = sonic.lastAllow;
+      d.drums = sonic.rhythm === false || !sonic.timbres ? 'OFF' : !C ? 'WAIT' : C.phase === 'play'
+        ? 'PLAY ' + (a && a.tex ? 'T' : '-') + (a && a.snare ? 'S' : '-') + (a && a.kick ? 'K' : '-') : C.phase.toUpperCase();
+      d.vhs = vhsOn; d.rate = sonic.ctx ? sonic.ctx.sampleRate : 48000;
+    }
+    return d;
+  }
+  // Where the menu is: the open list, and the levels above it (each with its list, title and row).
+  let menuTop = null, menuStack = [], menuTitle = 'CULTURE';
+  function enterSub(it) {
+    menuStack.push({ list: osdList, sel: osd.sel, title: menuTitle });
+    osdList = it.sub(); osd.sel = 0; menuTitle = 'CULTURE / ' + it.label; osdDrawn = 0;
+  }
+  function menuBack() {
+    if (!menuStack.length) { openMenu(false); return; }
+    const up = menuStack.pop(); osdList = up.list; osd.sel = up.sel; menuTitle = up.title; osdDrawn = 0;
+  }
+  function menuHome() { if (menuTop) osdList = menuTop; menuStack = []; menuTitle = 'CULTURE'; osd.sel = 0; scopeOn = false; }
+  function scopeTurn(d) { scopePage = (scopePage + d + SCOPE_PAGES.length) % SCOPE_PAGES.length; osdDrawn = 0; }
   let osdList = null, menuOpen = false, menuTimer = 0;
+  // Opening title: the logo stays, with a blinking PRESS ENTER (TAP TO START on touch screens),
+  // until Enter or a click or tap on the picture itself; buttons such as Full screen leave it in
+  // place. It then fades over 1 s. With CRT on it is drawn into the tube; otherwise it lies flat.
+  const logo = new Image(); logo.src = LOGO_SRC;
+  let logoGone = null; // time the fade began, or null while the logo is held
+  const logoAlpha = t => (logoGone === null ? 1 : Math.max(0, 1 - (t - logoGone)));
+  // The first dismissal also switches sound on: it is a deliberate gesture, which browsers
+  // require before audio may start. Later dismissals (after switching CRT back on) leave sound alone.
+  let firstStart = true;
+  const dismissLogo = () => {
+    if (logoGone !== null) return;
+    logoGone = performance.now() / 1000;
+    if (firstStart) { firstStart = false; if (!soundOn) toggleSound(); }
+  };
+  const logoPrompt = touch ? 'TAP TO START' : 'PRESS ENTER';
+  let logoJustDismissed = false;
+  addEventListener('keydown', e => {
+    if (logoGone === null && e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); dismissLogo(); }
+  }, { capture: true });
+  $('theater').addEventListener('pointerdown', e => {
+    if (logoGone === null && !e.target.closest('.hud, button')) { dismissLogo(); logoJustDismissed = true; }
+  }, { capture: true });
+  // Sound on touch browsers (from the site, mind-lathe D39). The logo's pointerdown starts the
+  // sound, but a touch pointerdown is not a user gesture to iOS Safari or to Chrome on a touch
+  // screen; only touchend and click are. The context is then created locked and stays silent while
+  // SOUND reads ON. So on every tap, click or key, if sound is on, the world is playing and the
+  // context is not running (locked, or "interrupted" by iOS after a call or an app switch), resume
+  // it inside that gesture. A context paused on purpose is left alone.
+  const unlockAudio = () => {
+    if (soundOn && running && sonic.ctx && sonic.ctx.state !== 'running') sonic.ctx.resume().catch(() => {});
+  };
+  for (const ev of ['touchend', 'click', 'keydown']) addEventListener(ev, unlockAudio, { capture: true, passive: true });
   // The menu box opens only on M (or its hint); like a television's, it closes itself after
   // 10 s without input. Mouse movement only brings up the hint strip along the bottom.
   function openMenu(o) {
+    if (o !== menuOpen) menuHome();
     menuOpen = o; clearTimeout(menuTimer); osdDrawn = 0;
-    if (o) menuTimer = setTimeout(() => { menuOpen = false; osdDrawn = 0; }, 10000);
+    if (o && !scopeOn) menuTimer = setTimeout(() => { menuOpen = false; osdDrawn = 0; }, 10000);
   }
   // On touch screens the strip drops the key letters: every entry is a tap target instead.
   const barItems = () => {
     const k = touch ? '' : 'x ';
     return [
       { label: running ? 'PLAY \u25B6' : 'PAUSE \u2759\u2759', reserve: 'PAUSE \u2759\u2759', act: () => setRunning(!running) },
-      { label: k.replace('x', 'E') + 'EMERGE', act: () => handle(world.forceEmerge(params)) },
+      { label: k.replace('x', 'E') + 'EMERGE', act: () => forceEmerge() },
       { label: k.replace('x', 'R') + (replay.keeper ? 'STOP' : 'REC'), reserve: k.replace('x', 'R') + 'STOP', act: () => toggleRecord(), disabled: !replay.supported },
       { label: k.replace('x', 'S') + (soundOn ? 'SOUND ON' : 'SOUND OFF'), reserve: k.replace('x', 'S') + 'SOUND OFF', act: () => toggleSound() },
       { label: k.replace('x', 'M') + 'MENU', act: () => openMenu(true) },
@@ -60,17 +209,20 @@
   function nudgeVolume(d) { const el = $('volume'); el.value = Math.max(0, Math.min(100, +el.value + d)); el.dispatchEvent(new Event('input')); }
   function osdRun(it, side) {
     if (!it || it.disabled) return;
+    if (it.sub && side !== 'dec') { enterSub(it); wake(); if (menuOpen) openMenu(true); return; }
+    if (it.back || (side === 'dec' && !it.dec && menuStack.length)) { menuBack(); wake(); if (menuOpen) openMenu(true); return; }
     if (side === 'dec' && it.dec) it.dec(); else if (side === 'inc' && it.inc) it.inc(); else if (it.act) it.act(); else if (it.inc) it.inc();
     osdDrawn = 0; wake();
     if (menuOpen) openMenu(true);
   }
   // Pointer position on the glass -> position in the menu canvas, through the tube's curvature.
   function osdPoint(e) {
-    const r = $('crtview').getBoundingClientRect();
+    // Flat view: the CRT canvas is hidden, so measure the world canvas, and skip the curvature.
+    const r = (crtOn && crt ? $('crtview') : cv).getBoundingClientRect();
     let lx, ly;
     if (sonic.rotated) { lx = (e.clientY - r.top) / r.height; ly = 1 - (e.clientX - r.left) / r.width; }
     else { lx = (e.clientX - r.left) / r.width; ly = (e.clientY - r.top) / r.height; }
-    const [ux, uy] = CRT.curve(lx, 1 - ly);
+    const [ux, uy] = crtOn && crt ? CRT.curve(lx, 1 - ly) : [lx, 1 - ly];
     return [ux * osd.canvas.width, (1 - uy) * osd.canvas.height];
   }
   // If the GPU drops the CRT's context, swap in a fresh canvas and rebuild on the next frame
@@ -82,9 +234,10 @@
   }
   function setCrt(on) {
     if (on && !crt) crt = CRT.create($('crtview'));
+    // Switching the set on shows the logo again, like a television's power-on splash.
+    if (on && !crtOn) logoGone = null;
     crtOn = on && !!crt;
     $('crtview').hidden = !crtOn;
-    sonic.setTape(crtOn);
     $('mask').hidden = !crtOn;
     cv.style.visibility = crtOn ? 'hidden' : '';
     for (const id of ['crt', 'hcrt']) {
@@ -146,6 +299,8 @@
     if (typeof layout === 'function') layout();
     if (replay) replay.setShape(W === H);
     world = new Core.World(W, H, (Math.random() * 2 ** 32) >>> 0);
+    hist = []; histGen = 0; stepMs = 0; capAt = 0; $('speed').max = 9; // re-learn the speed limit for the new size
+    sporeReadyGen = 0; sporePending = null; runLog = [];
     rings = []; palette = {}; births = 0; sonic.reset(); renderLedger();
   }
   function handle(ev) {
@@ -154,6 +309,11 @@
     if (ev.tier !== undefined) { const T = world.tiers[ev.tier]; rings.push({ x: ev.x, y: ev.y, t: 0, c: colorOf(T).css, spark: !!T.parents, mutant: T.mutatedFrom != null }); }
     renderLedger();
   }
+  // Forced emergence (E, the Emerge buttons, the menu). Where an emergence budget exists, it draws on it.
+  function forceEmerge() {
+    if (typeof spend === 'function') return spend(() => world.forceEmerge(params), 'force');
+    handle(world.forceEmerge(params));
+  }
   let stepAcc = 0;
   function tick() {
     // Fractional speeds step the world every second or fourth frame.
@@ -161,7 +321,8 @@
     // Large worlds can't always keep up with high speeds; cap the work per frame so the page stays responsive.
     const t0 = performance.now();
     while (stepAcc >= 1) {
-      stepAcc -= 1; handle(world.step(params));
+      stepAcc -= 1;
+      const s0 = performance.now(); handle(world.step(params)); noteStep(performance.now() - s0);
       if (performance.now() - t0 > 28) { stepAcc = 0; break; }
     }
     // Rule search tests a few candidates per frame so a birth never freezes the page.
@@ -191,14 +352,19 @@
       const t = performance.now() / 1000;
       crt.glitchAmt = 0;
       // On-screen menu: fades with the controls, redrawn about 15 times a second while showing.
-      const showing = osdActive() && (menuOpen || !theater.classList.contains('idle'));
+      const la = logoAlpha(t);
+      const showing = la > 0 || (osdActive() && (menuOpen || !theater.classList.contains('idle')));
       theater.classList.toggle('osd', osdActive());
       crt.osdAmt += ((showing ? 1 : 0) - crt.osdAmt) * 0.25;
+      if (la > 0) osdDrawn = Math.min(osdDrawn, t - 0.05); // keep redrawing while the logo shows (fade, blinking prompt)
       if (crt.osdAmt > 0.01 && t - osdDrawn > 0.066) {
-        osdList = osdList || osdItems();
+        osdList = osdList || (menuTop = osdItems());
         osd.resize(W, H); osd.rot = sonic.rotated;
-        osd.draw(osdList, { big: 'CH 00', line: `GEN ${String(world.gen).padStart(6, '0')}` }, { menu: menuOpen, bar: barItems(), touch });
-        crt.setOsd(osd.canvas); osdDrawn = t;
+        const status = { big: 'CH 00', line: `GEN ${String(world.gen).padStart(6, '0')}`, recOn: !!replay.keeper };
+        status.spore = sporesOn ? sporeLabel() : null;
+        osd.draw(osdList, status, { menu: osdActive() && menuOpen, title: menuTitle, scope: osdActive() && menuOpen && scopeOn ? scopeData() : null, pitch: osd.canvas.width / W, bar: osdActive() && logoGone !== null ? barItems() : null, touch,
+          logo: la > 0 ? { img: logo, alpha: la, prompt: logoGone === null ? logoPrompt : null, pitch: osd.canvas.width / W } : null });
+        crt.setOsd(osd.canvas); if (recCrt) recCrt.setOsd(osd.canvas); osdDrawn = t;
       }
       crt.render(cv, t);
       if (crt.lost) resetCrt();
@@ -217,6 +383,37 @@
       if (r.spark) { fctx.beginPath(); fctx.arc((r.x + 0.5) * sx, (r.y + 0.5) * sy, rad * 0.6, 0, Math.PI * 2); fctx.stroke(); }
     }
     fctx.globalAlpha = 1;
+    {
+      const la = logoAlpha(performance.now() / 1000);
+      if (la > 0 && !(crtOn && crt)) {
+        fctx.save();
+        if (sonic.rotated) { fctx.translate(fx.width / 2, fx.height / 2); fctx.rotate(-Math.PI / 2); fctx.translate(-fx.height / 2, -fx.width / 2); OSD.Menu.drawLogo(fctx, logo, la, fx.height, fx.width, logoGone === null ? logoPrompt : null, fx.width / W); }
+        else OSD.Menu.drawLogo(fctx, logo, la, fx.width, fx.height, logoGone === null ? logoPrompt : null, fx.width / W);
+        fctx.restore();
+      }
+    }
+    // Without the CRT, the same menu and strip, drawn flat over the picture: same fade, redraw rate
+    // and items as the CRT branch above. The logo is drawn flat just above, so it isn't passed.
+    if (!(crtOn && crt)) {
+      const t = performance.now() / 1000;
+      const showing = osdActive() && (menuOpen || !theater.classList.contains('idle'));
+      theater.classList.toggle('osd', osdActive());
+      flatOsdAmt += ((showing ? 1 : 0) - flatOsdAmt) * 0.25;
+      if (flatOsdAmt > 0.01) {
+        if (t - osdDrawn > 0.066) {
+          osdList = osdList || (menuTop = osdItems());
+          osd.resize(W, H); osd.rot = sonic.rotated;
+          const status = { big: 'CH 00', line: `GEN ${String(world.gen).padStart(6, '0')}`, recOn: !!replay.keeper };
+          status.spore = sporesOn ? sporeLabel() : null;
+          osd.draw(osdList, status, { menu: osdActive() && menuOpen, title: menuTitle, scope: osdActive() && menuOpen && scopeOn ? scopeData() : null, pitch: osd.canvas.width / W, bar: osdActive() && logoGone !== null ? barItems() : null, touch, logo: null });
+          osdDrawn = t;
+        }
+        // (An open menu dims the picture: the menu canvas itself carries the dimming, as in the tube.)
+        fctx.globalAlpha = flatOsdAmt; fctx.imageSmoothingEnabled = true;
+        fctx.drawImage(osd.canvas, 0, 0, fx.width, fx.height);
+        fctx.globalAlpha = 1;
+      }
+    }
     if (markers && world.search) {
       const S = world.search;
       fctx.setLineDash([4, 4]); fctx.strokeStyle = 'rgba(242,184,75,0.85)'; fctx.lineWidth = 1.5;
@@ -226,19 +423,63 @@
     // Recorder copy of exactly what is on screen (CRT included, markers if shown).
     if (replay.busy) {
       replay.tick(sonic.recordStream());
-      replay.frame(crtOn && crt ? $('crtview') : cv, crtOn && !!crt, markers ? fx : null);
+      // With CRT on, the recording gets its own tube rendered at the recording's full size, rather
+      // than a stretched copy of the on-screen picture.
+      if (crtOn && crt) {
+        if (!recCrt) { recCrtCanvas = document.createElement('canvas'); recCrt = CRT.create(recCrtCanvas); if (recCrt) recCrt.setOsd(osd.canvas); }
+        if (recCrt) {
+          recCrt.maskType = crt.maskType; recCrt.osdAmt = crt.osdAmt; recCrt.glitchAmt = crt.glitchAmt;
+          recCrt.render(cv, performance.now() / 1000, replay.canvas.width, replay.canvas.height);
+        }
+      }
+      replay.frame(crtOn && crt ? (recCrt ? recCrtCanvas : $('crtview')) : cv, crtOn && !!crt, markers ? fx : null);
     }
     if (replay.keeper) {
       const t = Math.floor(replay.elapsed()), lab = `Stop ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
       if ($('rec').textContent !== lab) { $('rec').textContent = lab; $('hrec').textContent = '■ ' + lab.slice(5); $('rectime').textContent = lab.slice(5); }
     }
     $('recdot').hidden = !replay.keeper;
+    if (sporePending !== null && !world.search) {
+      if (world.tiers.length > sporePending) {
+        // The new tier is the last one (searches never overlap). Mark it as made by a person,
+        // so the drum conductor counts only the world's own emergences.
+        world.tiers[world.tiers.length - 1].byUser = true;
+        if (pendingBudgeted) sporeReadyGen = world.gen + SPORE_COOL;
+      }
+      sporePending = null;
+    }
+    if (sporesOn && !hintShown && isFull() && logoGone !== null) {
+      hintShown = true; hintUntil = performance.now() + 7000;
+      try { localStorage.setItem('culture.sporeHint', '1'); } catch (e) {}
+    }
+    {
+      // Full screen without CRT: a badge in the top-left corner that fades with the controls.
+      // On the page: a line under the world. (With CRT in full screen, the OSD draws it.)
+      const lab = sporeLabel(), full = isFull();
+      if (!sporesOn) { $('sporedot').hidden = true; const off = '<span class="sl-idle">Spores off: clicks do nothing, and E emerges freely.</span>'; if ($('sporeline').innerHTML !== off) $('sporeline').innerHTML = off; }
+      else {
+      const blocks = lab.frac !== undefined ? ' <span class="sbar">' + Array.from({ length: 8 }, (_, k) => k < Math.floor(lab.frac * 8) ? '<i class="on"></i>' : '<i></i>').join('') + '</span>' : '';
+      const pd = $('sporedot');
+      pd.hidden = !full || osdActive() || logoGone === null;
+      if (!pd.hidden) {
+        const html = lab.text + blocks;
+        if (pd.innerHTML !== html) pd.innerHTML = html;
+        pd.classList.toggle('warn', !!lab.warn); pd.classList.toggle('below', !!replay.keeper);
+      }
+      const sl = $('sporeline'), page = { 'SPORE READY': 'Spore ready: click or tap the world to release a new law there.',
+        'GERMINATING\u2026': 'Spore germinating\u2026', 'SPORE WAIT': 'Spore waiting for the current emergence to settle.',
+        'NOT READY': 'Not ready yet.', 'SPORE': 'Spore recharging' }[lab.text] ?? 'Spore ready: click or tap the world to release a new law there.';
+      const html = '<span class="sl-' + (lab.warn ? 'warn' : lab.ready ? 'ready' : 'idle') + '">' + page + '</span>' + blocks;
+      if (sl.innerHTML !== html) sl.innerHTML = html;
+      }
+    }
     $('gen').textContent = world.gen.toLocaleString();
     $('ftier').textContent = world.frontier;
     $('fage').textContent = world.frontierAge.toLocaleString();
     $('fext').textContent = world.extinct.length;
     $('factive').textContent = world.active;
     $('hgen').textContent = world.gen.toLocaleString(); $('htier').textContent = world.frontier;
+    sampleScopes();
     const quiet = world.gen - world.lastBirth;
     $('quiet').textContent = quiet.toLocaleString();
     $('typical').textContent = Math.round(world.meanEpoch).toLocaleString();
@@ -277,6 +518,7 @@
       T.react.forEach((r, e) => { if (r) (groups[r] ??= []).push(e); });
       const reacts = Object.keys(groups).map(r => `${verbs[r]} ${groups[r].map(e => `<span class="elx" style="color:${famCss(e)}">${Core.ELEMENTS[e]}</span>`).join(', ')}`).join(' · ');
       el.innerHTML = `<span class="sw" style="background:${c.css}"></span><span class="name">Tier ${T.idx}</span><span class="rule">${Core.ruleStr(T.rule)}</span><span class="meta">${meta}</span>${reacts ? `<span class="meta reacts">${reacts}</span>` : ''}<span class="cov"><div style="background:${c.css};width:0"></div></span>`;
+      if (sonic.timbres) el.querySelector('.meta').textContent += ` · sounds ${sonic.classOf(T)}`;
       el._tier = T;
       L.appendChild(el);
     }
@@ -293,18 +535,79 @@
   function toggleSound() {
     soundOn = !soundOn;
     if (soundOn) sonic.start(); else sonic.stop();
+    if (soundOn && !running) syncPauseAudio(true); // switched on while paused: silent until play
     const on = soundOn;
     for (const id of ['sound', 'hsound']) { $(id).textContent = on ? 'Sound off' : 'Sound on'; $(id).setAttribute('aria-pressed', String(on)); }
   }
   $('sound').addEventListener('click', toggleSound);
+  // VHS audio: the tape chain on the mix (wow and flutter, band limits, saturation, hiss and hum).
+  // Its own switch, independent of the CRT picture; on by default. Key: V.
+  let vhsOn = true;
+  function setVhs(on) {
+    vhsOn = on; sonic.setTape(on);
+    $('vhs').textContent = on ? 'VHS audio: on' : 'VHS audio: off'; $('vhs').setAttribute('aria-pressed', String(on));
+    osdDrawn = 0;
+  }
+  $('vhs').addEventListener('click', () => setVhs(!vhsOn));
+  setVhs(true);
+  function setTimbres(on) {
+    sonic.setTimbres(on);
+    $('timbres').textContent = on ? 'Timbres: on' : 'Timbres: off'; $('timbres').setAttribute('aria-pressed', String(on));
+    renderLedger();
+  }
+  $('timbres').addEventListener('click', () => setTimbres(!sonic.timbres));
+  function setRhythm(on) {
+    sonic.setRhythm(on);
+    $('rhythm').textContent = on ? 'Drums: on' : 'Drums: off'; $('rhythm').setAttribute('aria-pressed', String(on));
+    $('hdrums').textContent = on ? 'Drums on' : 'Drums off'; $('hdrums').setAttribute('aria-pressed', String(on));
+    osdDrawn = 0;
+  }
+  $('rhythm').addEventListener('click', () => setRhythm(sonic.rhythm === false));
+  $('hdrums').addEventListener('click', () => { setRhythm(sonic.rhythm === false); wake(); });
   $('hsound').addEventListener('click', toggleSound);
+  // Pausing halts the sound as well as the world (from the site, mind-lathe D38): a short fade,
+  // then the audio clock is suspended. Every part (drums, arpeggios, bells) is scheduled against
+  // that clock with a short lookahead, so it freezes with it and picks up where it was on resume,
+  // instead of releasing a burst of queued notes. Sound stays "on" while paused.
+  let pauseFade = 0;
+  function syncPauseAudio(instant) {
+    if (!soundOn || !sonic.ctx || !sonic.master) return;
+    const g = sonic.master.gain, now = sonic.ctx.currentTime;
+    clearTimeout(pauseFade); g.cancelScheduledValues(now);
+    if (running) { sonic.start(); g.setValueAtTime(g.value, now); g.setTargetAtTime(sonic.volume, now, 0.05); }
+    else if (instant) { g.setValueAtTime(0, now); sonic.stop(); }
+    else { g.setTargetAtTime(0, now, 0.03); pauseFade = setTimeout(() => { if (!running) sonic.stop(); }, 200); }
+  }
   function setRunning(r) {
     running = r;
+    syncPauseAudio(false);
     for (const id of ['run', 'hrun']) $(id).textContent = running ? 'Pause' : 'Run';
   }
   $('hrun').addEventListener('click', () => setRunning(!running));
   function nudgeSpeed(d) {
-    const el = $('speed'); el.value = Math.max(0, Math.min(9, +el.value + d)); el.dispatchEvent(new Event('input'));
+    const el = $('speed'); el.value = Math.max(0, Math.min(+el.max, +el.value + d)); wantSpeed = +el.value; el.dispatchEvent(new Event('input'));
+  }
+  // The speed asked for, kept separately from the speed allowed, so a limit lifted later (a smaller
+  // world) brings the asked-for speed back.
+  let wantSpeed = +$('speed').value;
+  $('speed').addEventListener('input', e => { if (e.isTrusted) wantSpeed = +$('speed').value; });
+  // Speed limit. A generation's cost grows with the world (about 2 ms at 165×105, 20 ms or more at
+  // 550×350 on a laptop), so the fastest real speed depends on the size and the device. The page
+  // times its own generations and offers only the speeds it can keep up with while leaving room to
+  // draw: about 14 ms of simulation per frame. 1× always stays available; a world too big for 1×
+  // simply runs slower than real time.
+  let stepMs = 0, capAt = 0;
+  function noteStep(ms) {
+    stepMs = stepMs ? stepMs + (ms - stepMs) * 0.05 : ms;
+    const t = performance.now();
+    if (t - capAt < 1000) return;
+    capAt = t;
+    const el = $('speed'), perFrame = 14 / stepMs;
+    let cap = 2; // index of 1×
+    for (let i = 0; i < SPEEDS.length; i++) if (SPEEDS[i] <= Math.max(1, perFrame)) cap = Math.max(cap, i);
+    if (+el.max !== cap) { el.max = cap; el.title = `Fastest this world runs here: ${SPEEDS[cap]}×`; osdDrawn = 0; }
+    const target = Math.min(wantSpeed, cap);
+    if (+el.value !== target) { el.value = target; el.dispatchEvent(new Event('input')); }
   }
   $('hslower').addEventListener('click', () => nudgeSpeed(-1));
   $('hfaster').addEventListener('click', () => nudgeSpeed(1));
@@ -439,7 +742,7 @@
   }
   $('hsizedown').addEventListener('click', () => stepSize(-1));
   $('hsizeup').addEventListener('click', () => stepSize(1));
-  $('hforce').addEventListener('click', () => { handle(world.forceEmerge(params)); wake(); });
+  $('hforce').addEventListener('click', () => { forceEmerge(); wake(); });
   $('hreset').addEventListener('click', () => { newWorld(); layout(); wake(); });
   theater.addEventListener('pointermove', () => { if (isFull()) wake(); });
   theater.addEventListener('pointerdown', () => {
@@ -453,8 +756,14 @@
     if (h && h.i !== osd.sel) { osd.sel = h.i; osdDrawn = 0; }
   });
   theater.addEventListener('click', e => {
+    if (logoJustDismissed) { logoJustDismissed = false; e.cultureSkip = true; return; } // that click only dismissed the logo
     if (!osdActive() || e.target.closest('.hud')) return;
     const pt = osdPoint(e);
+    if (menuOpen && scopeOn) {
+      const k = osd.hitScope(...pt);
+      if (k === 'back') { scopeOn = false; openMenu(true); } else if (k === 'prev') scopeTurn(-1); else if (k === 'next') scopeTurn(1);
+      wake(); return;
+    }
     if (menuOpen) {
       const h = osd.hit(...pt);
       if (h) { osd.sel = h.i; osdRun(osdList[h.i], h.side); } else openMenu(false); // a click outside the box closes it
@@ -462,8 +771,68 @@
     }
     if (wokeFromIdle) return; // that tap only brought the strip back
     const b = osd.hitBar(...pt);
-    if (b && !b.disabled) { b.act(); osdDrawn = 0; }
+    if (b && !b.disabled) { b.act(); osdDrawn = 0; return; }
+    sporeAt(e);
   });
+  // A click on the world, anywhere the controls aren't, releases a spore there. The CRT path in
+  // full screen is handled above, after the menu and hint strip have had their chance; this one
+  // covers the flat view and the page outside full screen.
+  theater.addEventListener('click', e => {
+    if (e.cultureSkip || osdActive() || e.target.closest('.hud, button')) return;
+    if (logoGone === null || (isFull() && wokeFromIdle)) return;
+    sporeAt(e);
+  });
+  // Pointer -> world cell, undoing the portrait rotation and (with CRT on) the tube's curvature.
+  function cellAt(e) {
+    const el = crtOn && crt ? $('crtview') : cv, r = el.getBoundingClientRect();
+    let lx, ly;
+    if (sonic.rotated) { lx = (e.clientY - r.top) / r.height; ly = 1 - (e.clientX - r.left) / r.width; }
+    else { lx = (e.clientX - r.left) / r.width; ly = (e.clientY - r.top) / r.height; }
+    if (crtOn && crt) { const [ux, uy] = CRT.curve(lx, 1 - ly); lx = ux; ly = 1 - uy; }
+    if (lx < 0 || lx >= 1 || ly < 0 || ly >= 1) return null;
+    return [Math.floor(lx * W), Math.floor(ly * H)];
+  }
+  // Spends the shared budget on an emergence (a spore or a forced one). A refusal flashes NOT READY.
+  // With the Spores switch off there is no budget, so forced emergence is free again.
+  function spend(fn, kind) {
+    const ev = !sporesOn || sporeState().ready ? fn() : null;
+    if (ev) {
+      sporePending = world.tiers.length; pendingBudgeted = sporesOn;
+      runLog.push({ gen: ev.gen, kind, x: ev.x, y: ev.y });
+      handle(ev);
+    } else if (sporesOn) sporeDenied = performance.now();
+    osdDrawn = 0;
+  }
+  function sporeAt(e) {
+    if (!sporesOn) return;
+    const c = cellAt(e);
+    if (c) spend(() => world.emergeAt(c[0], c[1], params), 'spore');
+  }
+  function setSpores(on) {
+    sporesOn = on;
+    $('spores').textContent = on ? 'Spores: on' : 'Spores: off'; $('spores').setAttribute('aria-pressed', String(on));
+    osdDrawn = 0;
+  }
+  $('spores').addEventListener('click', () => setSpores(!sporesOn));
+  // ready: an emergence can be spent now. frac: how far through the recharge (1 = full).
+  // busy: a rule search or retreat is under way (natural or spent), which blocks spending.
+  function sporeState() {
+    if (sporePending !== null) return { ready: false, frac: 1, busy: true, pending: true };
+    if (world.gen < sporeReadyGen) return { ready: false, frac: 1 - (sporeReadyGen - world.gen) / SPORE_COOL, busy: false };
+    if (world.search || world.retreat) return { ready: false, frac: 1, busy: true };
+    return { ready: true, frac: 1, busy: false };
+  }
+  // VCR-style readout: SPORE READY; SPORE with eight blocks filling from hollow to solid while it
+  // recharges; GERMINATING… while a spent emergence searches for its rule; SPORE WAIT while the
+  // world's own search or a retreat runs. A refused click or E flashes NOT READY for a second.
+  function sporeLabel() {
+    if (performance.now() < hintUntil) return { text: (touch ? 'TAP' : 'CLICK') + ' THE WORLD TO RELEASE A SPORE', ready: true, hint: true };
+    const st = sporeState();
+    if (performance.now() - sporeDenied < 1000 && !st.ready) return { text: 'NOT READY', warn: true };
+    if (st.ready) return { text: 'SPORE READY', ready: true };
+    if (st.busy) return { text: st.pending ? 'GERMINATING\u2026' : 'SPORE WAIT' };
+    return { text: 'SPORE', frac: st.frac };
+  }
   // Leaving browser full screen by its own means (Esc, the system button) also leaves our view.
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && apiFull) { apiFull = false; exitFull(); }
@@ -474,12 +843,20 @@
     // so they can be used mid-take without anything appearing on screen.
     const typing = e.target.closest && e.target.closest('textarea, select, input:not([type=range])');
     if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && !e.repeat) {
-      if (e.key === 'e' || e.key === 'E') { e.preventDefault(); handle(world.forceEmerge(params)); return; }
+      if (e.key === 'e' || e.key === 'E') { e.preventDefault(); forceEmerge(); return; }
       if ((e.key === 'r' || e.key === 'R') && replay.supported) { e.preventDefault(); toggleRecord(); return; }
       if (e.key === 's' || e.key === 'S') { e.preventDefault(); toggleSound(); osdDrawn = 0; return; }
+      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); setRhythm(sonic.rhythm === false); return; }
+      if (e.key === 'v' || e.key === 'V') { e.preventDefault(); setVhs(!vhsOn); return; }
     }
     if (osdActive() && !typing && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); openMenu(!menuOpen); return; }
-    if (osdActive() && menuOpen && e.key === 'Escape') { e.preventDefault(); openMenu(false); return; }
+    if (osdActive() && menuOpen && scopeOn && ['ArrowLeft', 'ArrowRight', 'Escape', 'Backspace', 'Enter', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault(); wake();
+      if (e.key === 'ArrowLeft') scopeTurn(-1); else if (e.key === 'ArrowRight') scopeTurn(1);
+      else if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Enter') { scopeOn = false; openMenu(true); }
+      return;
+    }
+    if (osdActive() && menuOpen && (e.key === 'Escape' || e.key === 'Backspace')) { e.preventDefault(); menuBack(); if (menuOpen) openMenu(true); return; }
     if (osdActive() && menuOpen && osdList && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
       e.preventDefault(); wake(); osdDrawn = 0;
       const n = osdList.length, it = osdList[osd.sel];
@@ -497,7 +874,7 @@
   sonic.setVolume(0.49); $('volumeo').textContent = '70%';
   $('run').addEventListener('click', () => setRunning(!running));
   $('step').addEventListener('click', () => { setRunning(false); handle(world.step(params)); handle(world.work(params, 3)); });
-  $('force').addEventListener('click', () => handle(world.forceEmerge(params)));
+  $('force').addEventListener('click', () => forceEmerge());
   $('reset').addEventListener('click', newWorld);
   const showSize = () => {
     const [w, h] = sizes()[+$('size').value];
@@ -520,5 +897,9 @@
     markers = !markers;
     $('markers').classList.toggle('on', markers); $('markers').setAttribute('aria-pressed', String(markers));
   });
-  newWorld(); loop();
+  newWorld();
+  // CRT on for computers, off on touch devices, where the tube aliases on small screens and is heavy
+  // for a phone's GPU (from the site, mind-lathe D36). Browsers without WebGL fall back to flat.
+  setCrt(!touch);
+  loop();
 })();

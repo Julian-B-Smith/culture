@@ -76,18 +76,21 @@ void main(){
   float amt = clamp((cellPx - 2.5) / 1.5, 0.0, 1.0);
   // On-screen menu: drawn into the tube as light, before the mask, so it gets the same curvature,
   // scanlines and phosphors as the picture, the way a television's own menu did.
+  float oa = 0.0;
   if (osdAmt > 0.0) {
-    vec4 o = texture2D(osd, uv);
+    vec4 o = texture2D(osd, uv); oa = o.a * osdAmt;
     float sp = exp(-0.5 * f * f / 0.09) + exp(-0.5 * (1.0 - f) * (1.0 - f) / 0.09);
     sp = mix(1.0, sp, clamp((rowPx - 1.8) / 1.5, 0.0, 1.0));
-    col = col * (1.0 - o.a * osdAmt * 0.8) + lin(o.rgb) * o.a * osdAmt * 1.5 * sp;
+    // Opaque OSD pixels fully replace the picture beneath them; the menu box gets its see-through
+    // look from its own alpha.
+    col = col * (1.0 - o.a * osdAmt) + lin(o.rgb) * o.a * osdAmt * 1.5 * sp;
   }
   col *= mix(vec3(1.0), mask(x, uv.y * srcSize.y, n) * 2.35, amt);
   vec2 px = 1.0 / srcSize;
   vec3 glow = lin(texture2D(phos, uv + px * vec2(2.0, 0.0)).rgb) + lin(texture2D(phos, uv - px * vec2(2.0, 0.0)).rgb)
             + lin(texture2D(phos, uv + px * vec2(0.0, 2.0)).rgb) + lin(texture2D(phos, uv - px * vec2(0.0, 2.0)).rgb)
             + lin(texture2D(phos, uv + px * vec2(1.4, 1.4)).rgb) + lin(texture2D(phos, uv - px * vec2(1.4, 1.4)).rgb);
-  col += glow * 0.035;
+  col += glow * 0.035 * (1.0 - oa); // the picture's glow stays under opaque on-screen graphics
   vec2 d = uv - 0.5;
   col *= smoothstep(0.0, 0.012, uv.x) * smoothstep(0.0, 0.012, uv.y) * smoothstep(0.0, 0.012, 1.0 - uv.x) * smoothstep(0.0, 0.012, 1.0 - uv.y);
   col *= 1.0 - dot(d, d) * 1.1;
@@ -160,8 +163,12 @@ void main(){
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, osdTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
       },
-      render(source, timeSec) {
+      // fixedW/fixedH: render at exactly this size (used for the recorder's own copy, which is
+      // off screen); otherwise the size follows the canvas on screen.
+      render(source, timeSec, fixedW, fixedH) {
         if (gl.isContextLost()) return;
+        if (fixedW) { if (canvas.width !== fixedW || canvas.height !== fixedH) { canvas.width = fixedW; canvas.height = fixedH; } }
+        else {
         // Resize the drawing buffer only once the on-screen size has held still for a few frames.
         // Resizing every frame through a full-screen transition churns GPU buffers, and some
         // browsers then leave stale frames on screen.
@@ -170,6 +177,7 @@ void main(){
         if (cw0 !== canvas.width || ch0 !== canvas.height) {
           if (cw0 === wantW && ch0 === wantH) { if (++steady >= 8 || canvas.width < 2) { canvas.width = cw0; canvas.height = ch0; } }
           else { wantW = cw0; wantH = ch0; steady = 0; if (canvas.width < 2) { canvas.width = cw0; canvas.height = ch0; } }
+        }
         }
         const cw = canvas.width, ch = canvas.height;
         if (source.width !== W || source.height !== H) {
